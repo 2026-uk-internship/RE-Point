@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:mysql://db:3306/repoint?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Europe/London&characterEncoding=UTF-8
+    username: repoint_user
+    password: repoint_password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
