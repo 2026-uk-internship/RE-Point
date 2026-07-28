@@ -1,5 +1,17 @@
 spring:
   application:
     name: repoint
+
   profiles:
     active: local
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/repoint
+    username: repoint_user
+    password: helloworld
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true

@@ -1,8 +1,19 @@
 CREATE DATABASE repoint;
 USE repoint;
-
 SHOW TABLES;
 
+
+# USER AND GRANT 
+CREATE USER 'repoint_user'@'localhost' IDENTIFIED BY 'helloworld';
+CREATE USER '아이디'@'접속위치' IDENTIFIED BY '비밀번호';
+
+GRANT ALL PRIVILEGES ON repoint.* 
+TO 'repoint_user'@'localhost';
+
+FLUSH PRIVILEGES;
+
+
+#TABLE
 CREATE TABLE auth (
     id INT AUTO_INCREMENT PRIMARY KEY,
     phone VARCHAR(20) NOT NULL UNIQUE,
