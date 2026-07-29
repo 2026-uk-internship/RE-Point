@@ -1,16 +1,18 @@
-package com.repoint.domain.entity;
+package com.repoint.repoint.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "notifications")
+@Table(name = "favorites", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "product_id"})
+})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Notification {
+public class Favorite {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,10 +22,7 @@ public class Notification {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @Column(nullable = false, length = 255)
-    private String message;
-
-    @Column(name = "is_read")
-    @Builder.Default
-    private Boolean isRead = false;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private Product product;
 }

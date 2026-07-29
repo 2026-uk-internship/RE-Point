@@ -1,4 +1,4 @@
-package com.repoint.domain.entity;
+package com.repoint.repoint.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -6,29 +6,25 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "chats")
+@Table(name = "view_product")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Chat {
+public class ViewProduct {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_id")
-    private Room room;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    @Lob
-    @Column(nullable = false)
-    private String message;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private Product product;
 
     @Column(name = "date", updatable = false)
     private LocalDateTime date;

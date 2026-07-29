@@ -1,4 +1,4 @@
-package com.repoint.domain.entity;
+package com.repoint.repoint.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -6,28 +6,33 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "bids")
+@Table(name = "review")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Bid {
+public class Review {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "auction_id", nullable = false)
-    private Auction auction;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_id")
+    private User seller;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private User user;
+    @JoinColumn(name = "buyer_id")
+    private User buyer;
 
-    @Column(nullable = false)
-    private Integer point;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private Product product;
+
+    @Lob
+    @Column
+    private String comment;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

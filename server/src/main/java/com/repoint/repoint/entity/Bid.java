@@ -1,38 +1,33 @@
-package com.repoint.domain.entity;
+package com.repoint.repoint.entity;
 
-import com.repoint.domain.enums.PointHistoryType;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "point_history")
+@Table(name = "bids")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PointHistory {
+public class Bid {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ON DELETE SET NULL -> nullable (server treats null as "withdrawn user")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "auction_id", nullable = false)
+    private Auction auction;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
     @Column(nullable = false)
-    private Integer amount;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private PointHistoryType type;
-
-    @Column(name = "related_id")
-    private Long relatedId;
+    private Integer point;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -1,26 +1,23 @@
-package com.repoint.domain.entity;
+package com.repoint.repoint.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "favorites", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"user_id", "product_id"})
-})
+@Table(name = "product_images")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Favorite {
+public class ProductImage {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private User user;
+    @Column(nullable = false, length = 255)
+    private String img;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")

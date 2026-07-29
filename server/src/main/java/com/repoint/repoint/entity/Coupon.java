@@ -1,4 +1,4 @@
-package com.repoint.domain.entity;
+package com.repoint.repoint.entity;
 
 import com.repoint.domain.enums.CouponEffectType;
 import jakarta.persistence.*;
