@@ -13,7 +13,7 @@ TO 'repoint_user'@'localhost';
 FLUSH PRIVILEGES;
 
 
-#TABLE
+# TABLE
 CREATE TABLE auth (
     id INT AUTO_INCREMENT PRIMARY KEY,
     phone VARCHAR(20) NOT NULL UNIQUE,
