@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 void main() {
   runApp(const MyApp());
@@ -91,6 +92,9 @@ class _LoginPageState extends State<LoginPage> {
 
                 decoration: InputDecoration(
                   hintText: "Enter your password",
+                  hintStyle: TextStyle(
+                    color: Colors.white70, // 입력 전 안내 글자 색
+                  ),
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 18,
@@ -110,6 +114,32 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.transparent,
+                  child: Icon(FontAwesomeIcons.google, color: Colors.white),
+                ),
+
+                SizedBox(width: 20),
+
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.transparent,
+                  child: Icon(FontAwesomeIcons.apple, color: Colors.white),
+                ),
+
+                SizedBox(width: 20),
+
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.transparent,
+                  child: Icon(FontAwesomeIcons.facebookF, color: Colors.white),
+                ),
+              ],
             ),
           ],
         ),
