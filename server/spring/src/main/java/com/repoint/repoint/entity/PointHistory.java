@@ -1,48 +1,46 @@
 package com.repoint.repoint.entity;
 
-import com.repoint.repoint.enums.ReportStatus;
-import com.repoint.repoint.enums.ReportType;
+import com.repoint.domain.enums.PointHistoryType;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "reports")
+@Table(name = "point_history")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Report {
+public class PointHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // ON DELETE SET NULL -> nullable (server treats null as "withdrawn user")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    @Column(name = "date", updatable = false)
-    private LocalDateTime date;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20)
-    @Builder.Default
-    private ReportStatus status = ReportStatus.IN_PROGRESS;
+    @Column(nullable = false)
+    private Integer amount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private ReportType type;
+    private PointHistoryType type;
 
     @Column(name = "related_id")
     private Long relatedId;
 
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
     @PrePersist
     protected void onCreate() {
-        if (date == null) {
-            date = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
         }
     }
 }

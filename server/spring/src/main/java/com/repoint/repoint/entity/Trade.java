@@ -1,6 +1,6 @@
 package com.repoint.repoint.entity;
 
-import com.repoint.repoint.enums.TradeStatus;
+import com.repoint.domain.enums.TradeStatus;
 import jakarta.persistence.*;
 import lombok.*;
 

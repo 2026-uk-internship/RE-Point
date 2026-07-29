@@ -1,6 +1,6 @@
 package com.repoint.repoint.entity;
 
-import com.repoint.repoint.enums.CouponEffectType;
+import com.repoint.domain.enums.CouponEffectType;
 import jakarta.persistence.*;
 import lombok.*;
 

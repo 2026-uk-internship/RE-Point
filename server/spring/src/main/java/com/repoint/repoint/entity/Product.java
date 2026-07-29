@@ -1,7 +1,7 @@
 package com.repoint.repoint.entity;
 
-import com.repoint.repoint.enums.ProductStatus;
-import com.repoint.repoint.enums.ProductType;
+import com.repoint.domain.enums.ProductStatus;
+import com.repoint.domain.enums.ProductType;
 import jakarta.persistence.*;
 import lombok.*;
 

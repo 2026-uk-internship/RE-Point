@@ -1,6 +1,6 @@
 package com.repoint.repoint.entity;
 
-import com.repoint.domain.enums.PointHistoryType;
+import com.repoint.repoint.enums.PointHistoryType;
 import jakarta.persistence.*;
 import lombok.*;
 

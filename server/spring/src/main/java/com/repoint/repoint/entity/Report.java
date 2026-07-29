@@ -1,7 +1,7 @@
 package com.repoint.repoint.entity;
 
-import com.repoint.repoint.enums.ReportStatus;
-import com.repoint.repoint.enums.ReportType;
+import com.repoint.domain.enums.ReportStatus;
+import com.repoint.domain.enums.ReportType;
 import jakarta.persistence.*;
 import lombok.*;
 
