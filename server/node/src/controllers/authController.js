@@ -1,5 +1,6 @@
 const authModel = require("../models/authModel");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 // 회원가입 (signup)
 exports.signup = async (req, res) => {
@@ -92,9 +93,18 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Incorrect password." });
     }
 
-    return res
-      .status(200)
-      .json({ message: "Login successful", data: { email: user.email } });
+    // JWT payload에는 최소 정보만 (비밀번호 절대 넣지 말 것)
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
+    );
+
+    return res.status(200).json({
+      message: "Login successful",
+      token,
+      data: { id: user.id, email: user.email },
+    });
   } catch (err) {
     console.error(err);
     return res
