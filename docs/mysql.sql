@@ -306,6 +306,7 @@ CREATE TABLE reports (
     date DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('in_progress', 'end') DEFAULT 'in_progress',
     type ENUM('user', 'chat', 'product') NOT NULL,
+    contents TEXT,
     related_id INTEGER,
     
     FOREIGN KEY (user_id) REFERENCES users(id)
