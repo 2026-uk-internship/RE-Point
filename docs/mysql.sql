@@ -306,9 +306,20 @@ CREATE TABLE reports (
     date DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('in_progress', 'end') DEFAULT 'in_progress',
     type ENUM('user', 'chat', 'product') NOT NULL,
+    contents TEXT,
     related_id INTEGER,
     
     FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE SET NULL
         ON UPDATE CASCADE
+);
+
+CREATE TABLE email_verifications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(255) NOT NULL,
+  code CHAR(6) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  is_verified TINYINT(1) DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_email_code (email, code)
 );
