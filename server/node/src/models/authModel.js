@@ -13,8 +13,8 @@ exports.createUser = async (username, email, password, phone) => {
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
     const [auth] = await connection.query(
-      `INSERT INTO auth (phone, email, password) VALUES (?, ?, ?)`,
-      [phone, email, hashedPassword],
+      `INSERT INTO auth (phone, email, password, is_verified) VALUES (?, ?, ?, ?)`,
+      [phone, email, hashedPassword, true],
     );
 
     const authId = auth.insertId;
