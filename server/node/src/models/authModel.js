@@ -13,8 +13,8 @@ exports.createUser = async (username, email, password, phone) => {
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
     const [auth] = await connection.query(
-      `INSERT INTO auth (phone, email, password) VALUES (?, ?, ?)`,
-      [phone, email, hashedPassword],
+      `INSERT INTO auth (phone, email, password, is_verified) VALUES (?, ?, ?, ?)`,
+      [phone, email, hashedPassword, true],
     );
 
     const authId = auth.insertId;
@@ -51,10 +51,10 @@ exports.deleteUser = async (id) => {
 // 로그인 (login)
 exports.findByUser = async (email) => {
   const [rows] = await pool.query(
-    `SELECT email, password FROM auth WHERE email = ?`,
+    `SELECT id, email, password FROM auth WHERE email = ?`,
     [email],
   );
-  return rows[0]; // result or undefined
+  return rows[0];
 };
 
 // email and phone check

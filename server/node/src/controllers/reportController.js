@@ -4,12 +4,15 @@ exports.createReport = async (req, res) => {
   try {
     const { type, contents, related_id } = req.body;
 
-    if (!type || !contents || !related_id) {
-      return res.status(400).json({
-        message: "Required fields are missing.",
-      });
+    const VALID_TYPES = ["user", "chat", "product", "review"];
+
+    if (!VALID_TYPES.includes(type)) {
+      return res.status(400).json({ message: "Invalid report type." });
     }
 
+    if (!type || !contents || !related_id) {
+      return res.status(400).json({ message: "Required fields are missing." });
+    }
     const reportId = await reportModel.createReport({
       user_id: req.user.id,
       type,

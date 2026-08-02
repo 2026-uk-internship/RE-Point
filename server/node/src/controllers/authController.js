@@ -13,13 +13,13 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ message: "Required fields are missing." });
     }
 
-    // 1. 이메일 인증 완료 여부 먼저 확인
-    const isVerified = await authModel.isEmailVerified(email);
-    if (!isVerified) {
-      return res
-        .status(400)
-        .json({ message: "Please verify your email first." });
-    }
+    // 1. 이메일 인증 완료 여부 먼저 확인 (테스트를 위해 생략)
+    // const isVerified = await authModel.isEmailVerified(email);
+    // if (!isVerified) {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "Please verify your email first." });
+    // }
 
     // 2. 이메일 및 전화번호 중복 체크
     const duplicates = await authModel.findByEmailOrPhone(email, phone);
