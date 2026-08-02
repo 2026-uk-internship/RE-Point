@@ -51,10 +51,10 @@ exports.deleteUser = async (id) => {
 // 로그인 (login)
 exports.findByUser = async (email) => {
   const [rows] = await pool.query(
-    `SELECT email, password FROM auth WHERE email = ?`,
+    `SELECT id, email, password FROM auth WHERE email = ?`,
     [email],
   );
-  return rows[0]; // result or undefined
+  return rows[0];
 };
 
 // email and phone check

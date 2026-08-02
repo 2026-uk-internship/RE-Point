@@ -84,25 +84,29 @@ exports.getProductById = async (productId) => {
   return rows[0];
 };
 
-// 일반 상품 불러오기
-exports.getMainList = async () => {
+// 일반거래 목록
+exports.getGeneralList = async () => {
   const [rows] = await pool.query(
-    `SELECT id, title, type, money_price, point_price, location
+    `SELECT id, title, money_price AS price, location
      FROM products
-     WHERE type IN ('general', 'point') AND status = 'sale'
+     WHERE type = 'general' AND status = 'sale'
      ORDER BY created_at DESC`,
   );
-
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    price: row.type === "general" ? row.money_price : row.point_price,
-    type: row.type,
-    location: row.location,
-  }));
+  return rows;
 };
 
-// 경매 상품 불러오기
+// 포인트거래 목록
+exports.getPointList = async () => {
+  const [rows] = await pool.query(
+    `SELECT id, title, point_price AS price, location
+     FROM products
+     WHERE type = 'point' AND status = 'sale'
+     ORDER BY created_at DESC`,
+  );
+  return rows;
+};
+
+// 경매 목록
 exports.getAuctionList = async () => {
   const [rows] = await pool.query(
     `SELECT p.id, p.title, a.end_date, a.highest_point
@@ -129,7 +133,7 @@ exports.getAuctionList = async () => {
       id: row.id,
       title: row.title,
       isOngoing,
-      remaining, // "00:00" 형식
+      remaining,
       highestPoint: row.highest_point,
     };
   });

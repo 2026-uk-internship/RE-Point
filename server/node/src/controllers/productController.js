@@ -91,10 +91,9 @@ exports.getProduct = async (req, res) => {
   }
 };
 
-// 일반 상품 불러오기
-exports.getMainList = async (req, res) => {
+exports.getGeneralList = async (req, res) => {
   try {
-    const products = await productModel.getMainList();
+    const products = await productModel.getGeneralList();
     return res.status(200).json({ data: products });
   } catch (err) {
     console.error(err);
@@ -104,7 +103,18 @@ exports.getMainList = async (req, res) => {
   }
 };
 
-// 경매 상품 불러오기
+exports.getPointList = async (req, res) => {
+  try {
+    const products = await productModel.getPointList();
+    return res.status(200).json({ data: products });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ message: "An internal server error occurred." });
+  }
+};
+
 exports.getAuctionList = async (req, res) => {
   try {
     const auctions = await productModel.getAuctionList();

@@ -5,7 +5,8 @@ const productController = require("../controllers/productController");
 const { verifyToken } = require("../middlewares/authMiddleware");
 
 router.post("/", verifyToken, productController.createProduct); // POST /products
-router.get("/main", productController.getMainList); // GET /products/main
+router.get("/general", productController.getGeneralList); // GET /products/general
+router.get("/point", productController.getPointList); // GET /products/point
 router.get("/auctions", productController.getAuctionList); // GET /products/auctions
 router.get("/:id", productController.getProductDetail); // GET /products/:id
 
