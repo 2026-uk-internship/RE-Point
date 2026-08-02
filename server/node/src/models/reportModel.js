@@ -9,11 +9,3 @@ exports.createReport = async ({ user_id, type, contents, related_id }) => {
 
   return result.insertId;
 };
-
-exports.reportByUser = () => {};
-
-exports.reportByProduct = () => {};
-
-exports.reportByChat = () => {};
-
-exports.reportByReview = () => {};
