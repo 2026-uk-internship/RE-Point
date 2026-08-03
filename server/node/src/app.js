@@ -26,7 +26,6 @@ app.use("/category", categoryRoutes);
 app.use("/report", reportRoutes);
 app.use("/products", productRoutes);
 app.use("/rooms", roomRoutes);
-s;
 
 require("./sockets/chatSocket")(io);
 
