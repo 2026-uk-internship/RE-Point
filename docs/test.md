@@ -235,16 +235,19 @@
 
 ---
 
-GET /products/general?sort=likes // 좋아요순
-GET /products/general?sort=newest // 최근 생성순
-GET /products/general?sort=oldest // 오래된 순
-GET /products/general?sort=name // 이름순
-GET /products/point?sort=likes
-GET /products/auctions?sort=name
-
-### 3-2. 일반거래 상품 목록 O
+### 3-2. 일반거래 상품 목록
 
 `GET /products/general`
+
+**정렬** — `sort` 쿼리 파라미터 (생략 시 `newest`)
+| 값 | 설명 |
+|---|---|
+| `likes` | 좋아요(찜) 많은 순 |
+| `newest` | 최근 등록순 (기본값) |
+| `oldest` | 오래된 순 |
+| `name` | 이름순 |
+
+예: `GET /products/general?sort=likes`
 
 **응답 (200)**
 
@@ -255,7 +258,8 @@ GET /products/auctions?sort=name
       "id": 5,
       "title": "아이폰 13 팝니다",
       "price": 500000,
-      "location": "서울시 강남구"
+      "location": "서울시 강남구",
+      "favoriteCount": 3
     }
   ]
 }
@@ -263,9 +267,11 @@ GET /products/auctions?sort=name
 
 ---
 
-### 3-3. 포인트거래 상품 목록 O
+### 3-3. 포인트거래 상품 목록
 
 `GET /products/point`
+
+**정렬** — 3-2와 동일한 `sort` 파라미터 사용 (`likes` / `newest` / `oldest` / `name`)
 
 **응답 (200)**
 
@@ -276,7 +282,8 @@ GET /products/auctions?sort=name
       "id": 6,
       "title": "무선 이어폰 팝니다",
       "price": 3000,
-      "location": "서울시 마포구"
+      "location": "서울시 마포구",
+      "favoriteCount": 0
     }
   ]
 }
@@ -286,9 +293,11 @@ GET /products/auctions?sort=name
 
 ---
 
-### 3-4. 경매 상품 목록 O
+### 3-4. 경매 상품 목록
 
 `GET /products/auctions`
+
+**정렬** — 3-2와 동일한 `sort` 파라미터 사용 (`likes` / `newest` / `oldest` / `name`)
 
 **응답 (200)**
 
@@ -300,14 +309,16 @@ GET /products/auctions?sort=name
       "title": "빈티지 카메라 경매",
       "isOngoing": true,
       "remaining": "05:23",
-      "highestPoint": 1500
+      "highestPoint": 1500,
+      "favoriteCount": 2
     },
     {
       "id": 8,
       "title": "레고 세트 경매",
       "isOngoing": false,
       "remaining": "00:00",
-      "highestPoint": 800
+      "highestPoint": 800,
+      "favoriteCount": 0
     }
   ]
 }
@@ -349,6 +360,49 @@ GET /products/auctions?sort=name
 - `temperature`: 판매자의 실제 온도 수치
 - `temperatureLevel`: 색상 표시용으로 이미 단계 계산까지 해서 내려줘요 (`"cold"` / `"normal"` / `"warm"` / `"hot"`) → 프론트는 이 값만 보고 이미지/색상 매핑하면 돼요. 기준 수치는 나중에 바뀔 수 있어요.
 - `createdDaysAgo`: 등록된 지 며칠 됐는지, `"n일"` 형식 문자열로 내려줘요.
+
+---
+
+### 3-6. 같은 카테고리의 다른 상품
+
+`GET /products/:id/related-category`
+
+예: `GET /products/5/related-category`
+
+상품 상세 페이지에서 "같은 카테고리 상품" 섹션에 쓰면 돼요. 보고 있는 상품과 **같은 타입(general/point/auction)**, **같은 카테고리**인 상품만 나와요.
+
+**응답 (200)**
+
+```json
+{
+  "data": [
+    { "id": 8, "title": "무선 이어폰 팝니다", "img": "url1" },
+    { "id": 12, "title": "블루투스 스피커", "img": "url3" }
+  ]
+}
+```
+
+> 경매 상품처럼 카테고리가 없는 상품이면 빈 배열(`[]`)이 와요.
+
+---
+
+### 3-7. 같은 판매자의 다른 상품
+
+`GET /products/:id/related-seller`
+
+예: `GET /products/5/related-seller`
+
+보고 있는 상품과 **같은 타입(general/point/auction)**이면서, 같은 판매자가 등록한 다른 상품만 나와요.
+
+**응답 (200)**
+
+```json
+{
+  "data": [{ "id": 9, "title": "노트북 팝니다", "img": "url2" }]
+}
+```
+
+> 3-6, 3-7 모두 지금 보고 있는 상품 자체는 목록에서 빠지고, 판매중(`sale`)인 상품만 나와요.
 
 ---
 
@@ -511,7 +565,7 @@ socket.connect();
 
 ## 7. 이메일 인증 (Email Verification)
 
-가입 절차상 구현은 되어있고, **테스트 편의를 위해 지금은 회원가입 시 자동으로 인증된 상태(`is_verified = true`)로 처리**
+가입 절차상 구현은 되어있고, **테스트 편의를 위해 지금은 회원가입 시 자동으로 인증된 상태(`is_verified = true`)로 처리** 중이에요.
 
 ---
 

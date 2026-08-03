@@ -223,3 +223,53 @@ exports.getProductDetail = async (productId) => {
 //   );
 //   return rows[0];
 // };
+
+// 같은 카테고리의 다른 상품 (같은 타입만)
+exports.getRelatedByCategory = async (productId) => {
+  const [current] = await pool.query(
+    `SELECT category_id, type FROM products WHERE id = ?`,
+    [productId],
+  );
+
+  if (current.length === 0) return [];
+
+  const { category_id, type } = current[0];
+
+  if (!category_id) return []; // 카테고리 없는 상품(경매 등)이면 빈 배열
+
+  const [rows] = await pool.query(
+    `SELECT
+       p.id, p.title,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img
+     FROM products p
+     WHERE p.category_id = ? AND p.type = ? AND p.id != ? AND p.status = 'sale'
+     ORDER BY p.created_at DESC`,
+    [category_id, type, productId],
+  );
+
+  return rows;
+};
+
+// 같은 판매자의 다른 상품 (같은 타입만)
+exports.getRelatedBySeller = async (productId) => {
+  const [current] = await pool.query(
+    `SELECT user_id, type FROM products WHERE id = ?`,
+    [productId],
+  );
+
+  if (current.length === 0) return [];
+
+  const { user_id, type } = current[0];
+
+  const [rows] = await pool.query(
+    `SELECT
+       p.id, p.title,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img
+     FROM products p
+     WHERE p.user_id = ? AND p.type = ? AND p.id != ? AND p.status = 'sale'
+     ORDER BY p.created_at DESC`,
+    [user_id, type, productId],
+  );
+
+  return rows;
+};

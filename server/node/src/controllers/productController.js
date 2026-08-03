@@ -153,3 +153,29 @@ exports.getProductDetail = async (req, res) => {
 // exports.getAuctionDetail = async (req, res) => {
 //   ...
 // };
+
+exports.getRelatedByCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const products = await productModel.getRelatedByCategory(id);
+    return res.status(200).json({ data: products });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ message: "An internal server error occurred." });
+  }
+};
+
+exports.getRelatedBySeller = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const products = await productModel.getRelatedBySeller(id);
+    return res.status(200).json({ data: products });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ message: "An internal server error occurred." });
+  }
+};
