@@ -19,11 +19,13 @@ const authRoutes = require("./routes/authRoutes");
 const productRoutes = require("./routes/productRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const roomRoutes = require("./routes/roomRoutes");
 
 app.use("/auth", authRoutes);
 app.use("/category", categoryRoutes);
 app.use("/report", reportRoutes);
 app.use("/products", productRoutes);
+app.use("/rooms", roomRoutes);
 
 require("./sockets/chatSocket")(io);
 
