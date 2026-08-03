@@ -85,35 +85,56 @@ exports.getProductById = async (productId) => {
   return rows[0];
 };
 
+const SORT_MAP = {
+  likes: "favoriteCount DESC",
+  newest: "p.created_at DESC",
+  oldest: "p.created_at ASC",
+  name: "p.title ASC",
+};
+
+const getSortClause = (sort) => SORT_MAP[sort] || SORT_MAP.newest; // 기본값: 최신순
+
 // 일반거래 목록
-exports.getGeneralList = async () => {
+exports.getGeneralList = async (sort) => {
   const [rows] = await pool.query(
-    `SELECT id, title, money_price AS price, location
-     FROM products
-     WHERE type = 'general' AND status = 'sale'
-     ORDER BY created_at DESC`,
+    `SELECT
+       p.id, p.title, p.money_price AS price, p.location,
+       COUNT(f.id) AS favoriteCount
+     FROM products p
+     LEFT JOIN favorites f ON f.product_id = p.id
+     WHERE p.type = 'general' AND p.status = 'sale'
+     GROUP BY p.id
+     ORDER BY ${getSortClause(sort)}`,
   );
   return rows;
 };
 
 // 포인트거래 목록
-exports.getPointList = async () => {
+exports.getPointList = async (sort) => {
   const [rows] = await pool.query(
-    `SELECT id, title, point_price AS price, location
-     FROM products
-     WHERE type = 'point' AND status = 'sale'
-     ORDER BY created_at DESC`,
+    `SELECT
+       p.id, p.title, p.point_price AS price, p.location,
+       COUNT(f.id) AS favoriteCount
+     FROM products p
+     LEFT JOIN favorites f ON f.product_id = p.id
+     WHERE p.type = 'point' AND p.status = 'sale'
+     GROUP BY p.id
+     ORDER BY ${getSortClause(sort)}`,
   );
   return rows;
 };
 
 // 경매 목록
-exports.getAuctionList = async () => {
+exports.getAuctionList = async (sort) => {
   const [rows] = await pool.query(
-    `SELECT p.id, p.title, a.end_date, a.highest_point
+    `SELECT
+       p.id, p.title, a.end_date, a.highest_point,
+       COUNT(f.id) AS favoriteCount
      FROM auction a
      JOIN products p ON p.id = a.product_id
-     ORDER BY a.end_date ASC`,
+     LEFT JOIN favorites f ON f.product_id = p.id
+     GROUP BY p.id
+     ORDER BY ${getSortClause(sort)}`,
   );
 
   const now = new Date();
@@ -136,6 +157,7 @@ exports.getAuctionList = async () => {
       isOngoing,
       remaining,
       highestPoint: row.highest_point,
+      favoriteCount: row.favoriteCount,
     };
   });
 };

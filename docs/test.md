@@ -235,6 +235,13 @@
 
 ---
 
+GET /products/general?sort=likes // 좋아요순
+GET /products/general?sort=newest // 최근 생성순
+GET /products/general?sort=oldest // 오래된 순
+GET /products/general?sort=name // 이름순
+GET /products/point?sort=likes
+GET /products/auctions?sort=name
+
 ### 3-2. 일반거래 상품 목록 O
 
 `GET /products/general`
@@ -504,7 +511,7 @@ socket.connect();
 
 ## 7. 이메일 인증 (Email Verification)
 
-가입 절차상 구현은 되어있고, **테스트 편의를 위해 지금은 회원가입 시 자동으로 인증된 상태(`is_verified = true`)로 처리** 
+가입 절차상 구현은 되어있고, **테스트 편의를 위해 지금은 회원가입 시 자동으로 인증된 상태(`is_verified = true`)로 처리**
 
 ---
 
