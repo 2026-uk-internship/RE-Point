@@ -569,6 +569,37 @@ socket.connect();
 
 ---
 
+## 8. 프로필 (Profile)
+
+### 8-1. 내 프로필 조회
+
+`GET /users/me`
+
+**응답 (200)**
+
+```json
+{
+  "data": {
+    "name": "test",
+    "img": "profile.jpg",
+    "temperature": 65,
+    "temperatureLevel": "warm",
+    "point": 1200,
+    "totalEarnedPoint": 3400,
+    "boughtCount": 5,
+    "soldCount": 8,
+    "co2SavedKg": 412.5
+  }
+}
+```
+
+- `temperatureLevel`: 상품 상세와 동일하게 서버에서 단계 계산해서 내려줘요 (`"cold"` / `"normal"` / `"warm"` / `"hot"`)
+- `totalEarnedPoint`: 지금까지 판매로 벌어들인 포인트 누적값
+- `boughtCount` / `soldCount`: 완료된 거래(`trades.status = 'completed'`) 기준 구매/판매 건수
+- `co2SavedKg`: 완료된 거래(구매+판매 합산)를 카테고리별 절감 가중치로 환산한 **추정치**예요. 실제 측정값이 아니라 대략적인 참고 수치라, 프론트에서 노출할 때 "약 OOkg 절약" 정도로
+
+---
+
 ## 아직 준비 중인 기능
 
 - 경매 상세 페이지 API (디자인 확정 대기)
