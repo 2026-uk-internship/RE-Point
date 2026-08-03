@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { getTemperatureLevel } = require("../utils/temperature");
 
 exports.createProduct = async (userId, productData) => {
   const {
