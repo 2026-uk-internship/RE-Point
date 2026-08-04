@@ -273,3 +273,28 @@ exports.getRelatedBySeller = async (productId) => {
 
   return rows;
 };
+
+exports.searchProducts = async (keyword) => {
+  const [rows] = await pool.query(
+    `SELECT
+       p.id, p.title, p.type, p.money_price, p.point_price,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img
+     FROM products p
+     WHERE p.title LIKE ? AND p.status = 'sale'
+     ORDER BY p.created_at DESC`,
+    [`%${keyword}%`],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    type: row.type,
+    price:
+      row.type === "general"
+        ? row.money_price
+        : row.type === "point"
+          ? row.point_price
+          : null,
+    img: row.img,
+  }));
+};

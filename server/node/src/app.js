@@ -21,9 +21,11 @@ const productRoutes = require("./routes/productRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const roomRoutes = require("./routes/roomRoutes");
+const searchRoutes = require("./routes/searchRoutes");
 
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
+app.use("/search", searchRoutes);
 app.use("/category", categoryRoutes);
 app.use("/report", reportRoutes);
 app.use("/products", productRoutes);
