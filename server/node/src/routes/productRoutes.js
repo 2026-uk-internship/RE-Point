@@ -4,6 +4,7 @@ const router = express.Router();
 const productController = require("../controllers/productController");
 const { verifyToken } = require("../middlewares/authMiddleware");
 const upload = require("../config/upload");
+const favoriteController = require("../controllers/favoriteController");
 
 router.post("/", verifyToken, productController.createProduct);
 router.get("/general", productController.getGeneralList);
