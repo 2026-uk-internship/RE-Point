@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const productController = require("../controllers/productController");
 const { verifyToken } = require("../middlewares/authMiddleware");
+const upload = require("../config/upload");
 
 router.post("/", verifyToken, productController.createProduct);
 router.get("/general", productController.getGeneralList);
