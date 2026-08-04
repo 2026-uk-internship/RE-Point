@@ -111,7 +111,9 @@
   "location": "...",
   "createdDaysAgo": "3일",
   "category": "...",
-  "images": ["url1"]
+  "images": ["url1"],
+  "favoriteCount": 5,
+  "chatCount": 2
 }
 ```
 
@@ -124,7 +126,7 @@
 ### 관심(찜) 토글
 
 `POST /products/:id/favorite`
-응답: `{ "data": { "favorited": true } }`
+응답: `{ "data": { "favorited": true, "favoriteCount": 5 } }` — 최신 찜 개수까지 같이 와서 프론트에서 바로 반영 가능
 
 ---
 

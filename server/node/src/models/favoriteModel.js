@@ -8,12 +8,17 @@ exports.toggleFavorite = async (userId, productId) => {
 
   if (existing.length > 0) {
     await pool.query(`DELETE FROM favorites WHERE id = ?`, [existing[0].id]);
-    return { favorited: false };
+  } else {
+    await pool.query(
+      `INSERT INTO favorites (user_id, product_id) VALUES (?, ?)`,
+      [userId, productId],
+    );
   }
 
-  await pool.query(
-    `INSERT INTO favorites (user_id, product_id) VALUES (?, ?)`,
-    [userId, productId],
+  const [[{ count }]] = await pool.query(
+    `SELECT COUNT(*) AS count FROM favorites WHERE product_id = ?`,
+    [productId],
   );
-  return { favorited: true };
+
+  return { favorited: existing.length === 0, favoriteCount: count };
 };

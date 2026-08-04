@@ -169,7 +169,9 @@ exports.getProductDetail = async (productId) => {
        p.id, p.title, p.description, p.money_price, p.point_price, p.type, p.created_at,
        u.name AS user_name, u.temperature,
        loc.city,
-       c.name AS category_name
+       c.name AS category_name,
+       (SELECT COUNT(*) FROM favorites f WHERE f.product_id = p.id) AS favoriteCount,
+       (SELECT COUNT(*) FROM rooms r WHERE r.product_id = p.id) AS chatCount
      FROM products p
      JOIN users u ON u.id = p.user_id
      LEFT JOIN location loc ON loc.id = u.location_id
@@ -199,10 +201,12 @@ exports.getProductDetail = async (productId) => {
     userName: product.user_name,
     temperature: product.temperature,
     temperatureLevel: getTemperatureLevel(product.temperature),
-    location: product.city, // ← region/city 조합이 아니라 city 하나만 그대로 사용
+    location: product.city,
     createdDaysAgo: `${diffDays}일`,
     category: product.category_name,
     images: images.map((row) => row.img),
+    favoriteCount: product.favoriteCount,
+    chatCount: product.chatCount,
   };
 };
 

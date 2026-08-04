@@ -2,7 +2,7 @@ const favoriteModel = require("../models/favoriteModel");
 
 exports.toggleFavorite = async (req, res) => {
   try {
-    const { id } = req.params; // productId
+    const { id } = req.params;
     const result = await favoriteModel.toggleFavorite(req.user.id, id);
     return res.status(200).json({ data: result });
   } catch (err) {
