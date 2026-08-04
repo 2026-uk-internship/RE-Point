@@ -93,7 +93,8 @@ exports.getProduct = async (req, res) => {
 
 exports.getGeneralList = async (req, res) => {
   try {
-    const products = await productModel.getGeneralList();
+    const { sort } = req.query; // ?sort=likes
+    const products = await productModel.getGeneralList(sort);
     return res.status(200).json({ data: products });
   } catch (err) {
     console.error(err);
@@ -105,7 +106,8 @@ exports.getGeneralList = async (req, res) => {
 
 exports.getPointList = async (req, res) => {
   try {
-    const products = await productModel.getPointList();
+    const { sort } = req.query;
+    const products = await productModel.getPointList(sort);
     return res.status(200).json({ data: products });
   } catch (err) {
     console.error(err);
@@ -117,7 +119,8 @@ exports.getPointList = async (req, res) => {
 
 exports.getAuctionList = async (req, res) => {
   try {
-    const auctions = await productModel.getAuctionList();
+    const { sort } = req.query;
+    const auctions = await productModel.getAuctionList(sort);
     return res.status(200).json({ data: auctions });
   } catch (err) {
     console.error(err);
@@ -150,3 +153,29 @@ exports.getProductDetail = async (req, res) => {
 // exports.getAuctionDetail = async (req, res) => {
 //   ...
 // };
+
+exports.getRelatedByCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const products = await productModel.getRelatedByCategory(id);
+    return res.status(200).json({ data: products });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ message: "An internal server error occurred." });
+  }
+};
+
+exports.getRelatedBySeller = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const products = await productModel.getRelatedBySeller(id);
+    return res.status(200).json({ data: products });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ message: "An internal server error occurred." });
+  }
+};

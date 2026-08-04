@@ -1,6 +1,9 @@
 // src/sockets/chatSocket.js
 const jwt = require("jsonwebtoken");
 const chatModel = require("../models/chatModel");
+const roomModel = require("../models/roomModel");
+const { getTemperatureLevel } = require("../utils/temperature");
+const { formatTimeAMPM } = require("../utils/formatTime");
 
 module.exports = (io) => {
   // 연결 시점에 토큰 검증
@@ -25,7 +28,16 @@ module.exports = (io) => {
     socket.on("join_room", async (roomId) => {
       socket.join(`room_${roomId}`);
 
-      // 이전 대화 내역 불러와서 보내주기
+      const roomInfo = await roomModel.getRoomInfo(roomId, socket.user.id);
+      socket.emit("room_info", {
+        counterpartName: roomInfo.counterpartName,
+        counterpartTemperature: roomInfo.counterpartTemperature,
+        counterpartTemperatureLevel: getTemperatureLevel(
+          roomInfo.counterpartTemperature,
+        ),
+        productImg: roomInfo.productImg,
+      });
+
       const history = await chatModel.getMessagesByRoom(roomId);
       socket.emit("chat_history", history);
     });
@@ -37,17 +49,32 @@ module.exports = (io) => {
         userId: socket.user.id,
         message,
       });
+      const now = new Date();
 
       const payload = {
         id: chatId,
         roomId,
         userId: socket.user.id,
         message,
-        date: new Date(),
+        date: now,
+        timeDisplay: formatTimeAMPM(now),
       };
 
       // 같은 방에 있는 사람들 전체에게 전송 (자신 포함)
       io.to(`room_${roomId}`).emit("receive_message", payload);
+    });
+
+    // 작성 중 표시
+    socket.on("typing", ({ roomId }) => {
+      socket
+        .to(`room_${roomId}`)
+        .emit("user_typing", { userId: socket.user.id });
+    });
+
+    socket.on("stop_typing", ({ roomId }) => {
+      socket
+        .to(`room_${roomId}`)
+        .emit("user_stop_typing", { userId: socket.user.id });
     });
 
     socket.on("disconnect", () => {

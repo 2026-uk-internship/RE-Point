@@ -235,9 +235,19 @@
 
 ---
 
-### 3-2. 일반거래 상품 목록 O
+### 3-2. 일반거래 상품 목록
 
 `GET /products/general`
+
+**정렬** — `sort` 쿼리 파라미터 (생략 시 `newest`)
+| 값 | 설명 |
+|---|---|
+| `likes` | 좋아요(찜) 많은 순 |
+| `newest` | 최근 등록순 (기본값) |
+| `oldest` | 오래된 순 |
+| `name` | 이름순 |
+
+예: `GET /products/general?sort=likes`
 
 **응답 (200)**
 
@@ -248,7 +258,8 @@
       "id": 5,
       "title": "아이폰 13 팝니다",
       "price": 500000,
-      "location": "서울시 강남구"
+      "location": "서울시 강남구",
+      "favoriteCount": 3
     }
   ]
 }
@@ -256,9 +267,11 @@
 
 ---
 
-### 3-3. 포인트거래 상품 목록 O
+### 3-3. 포인트거래 상품 목록
 
 `GET /products/point`
+
+**정렬** — 3-2와 동일한 `sort` 파라미터 사용 (`likes` / `newest` / `oldest` / `name`)
 
 **응답 (200)**
 
@@ -269,7 +282,8 @@
       "id": 6,
       "title": "무선 이어폰 팝니다",
       "price": 3000,
-      "location": "서울시 마포구"
+      "location": "서울시 마포구",
+      "favoriteCount": 0
     }
   ]
 }
@@ -279,9 +293,11 @@
 
 ---
 
-### 3-4. 경매 상품 목록 O
+### 3-4. 경매 상품 목록
 
 `GET /products/auctions`
+
+**정렬** — 3-2와 동일한 `sort` 파라미터 사용 (`likes` / `newest` / `oldest` / `name`)
 
 **응답 (200)**
 
@@ -293,14 +309,16 @@
       "title": "빈티지 카메라 경매",
       "isOngoing": true,
       "remaining": "05:23",
-      "highestPoint": 1500
+      "highestPoint": 1500,
+      "favoriteCount": 2
     },
     {
       "id": 8,
       "title": "레고 세트 경매",
       "isOngoing": false,
       "remaining": "00:00",
-      "highestPoint": 800
+      "highestPoint": 800,
+      "favoriteCount": 0
     }
   ]
 }
@@ -342,6 +360,49 @@
 - `temperature`: 판매자의 실제 온도 수치
 - `temperatureLevel`: 색상 표시용으로 이미 단계 계산까지 해서 내려줘요 (`"cold"` / `"normal"` / `"warm"` / `"hot"`) → 프론트는 이 값만 보고 이미지/색상 매핑하면 돼요. 기준 수치는 나중에 바뀔 수 있어요.
 - `createdDaysAgo`: 등록된 지 며칠 됐는지, `"n일"` 형식 문자열로 내려줘요.
+
+---
+
+### 3-6. 같은 카테고리의 다른 상품
+
+`GET /products/:id/related-category`
+
+예: `GET /products/5/related-category`
+
+상품 상세 페이지에서 "같은 카테고리 상품" 섹션에 쓰면 돼요. 보고 있는 상품과 **같은 타입(general/point/auction)**, **같은 카테고리**인 상품만 나와요.
+
+**응답 (200)**
+
+```json
+{
+  "data": [
+    { "id": 8, "title": "무선 이어폰 팝니다", "img": "url1" },
+    { "id": 12, "title": "블루투스 스피커", "img": "url3" }
+  ]
+}
+```
+
+> 경매 상품처럼 카테고리가 없는 상품이면 빈 배열(`[]`)이 와요.
+
+---
+
+### 3-7. 같은 판매자의 다른 상품
+
+`GET /products/:id/related-seller`
+
+예: `GET /products/5/related-seller`
+
+보고 있는 상품과 **같은 타입(general/point/auction)**이면서, 같은 판매자가 등록한 다른 상품만 나와요.
+
+**응답 (200)**
+
+```json
+{
+  "data": [{ "id": 9, "title": "노트북 팝니다", "img": "url2" }]
+}
+```
+
+> 3-6, 3-7 모두 지금 보고 있는 상품 자체는 목록에서 빠지고, 판매중(`sale`)인 상품만 나와요.
 
 ---
 
@@ -387,6 +448,10 @@
 ### 5-1. 채팅방 목록 조회
 
 `GET /rooms`
+
+**검색** — `keyword` 쿼리 파라미터 (생략 시 전체 목록). 상대방 이름에 포함된 텍스트로 검색해요.
+
+예: `GET /rooms?keyword=철수`
 
 **응답 (200)**
 
@@ -466,7 +531,18 @@ socket.connect();
 
 (방(room) id 하나만 숫자로 전송 — 5번 채팅방 API로 받은 `roomId`)
 
-**받는 이벤트**: `chat_history` — 입장하면 이전 대화 내역을 배열로 받아요.
+**받는 이벤트 1**: `room_info` — 채팅방 상단 헤더용 정보예요.
+
+```json
+{
+  "counterpartName": "seller01",
+  "counterpartTemperature": 65,
+  "counterpartTemperatureLevel": "warm",
+  "productImg": "product_url.jpg"
+}
+```
+
+**받는 이벤트 2**: `chat_history` — 이전 대화 내역을 배열로 받아요.
 
 ```json
 [
@@ -475,10 +551,13 @@ socket.connect();
     "user_id": 2,
     "user_name": "seller01",
     "message": "안녕하세요",
-    "date": "2026-08-01T10:00:00"
+    "date": "2026-08-01T10:00:00",
+    "timeDisplay": "10:00 AM"
   }
 ]
 ```
+
+- `timeDisplay`: 화면에 바로 표시할 수 있는 `hh:mm AM/PM` 형식이에요. 원본 `date`도 같이 오니, 날짜 구분(오늘/어제 등)이 필요하면 `date`를 활용하시면 돼요.
 
 ### 6-3. 메시지 보내기
 
@@ -496,18 +575,327 @@ socket.connect();
   "roomId": 5,
   "userId": 3,
   "message": "네고 가능할까요?",
-  "date": "2026-08-02T14:20:00"
+  "date": "2026-08-02T14:20:00",
+  "timeDisplay": "02:20 PM"
 }
 ```
+
+### 6-4. 작성 중 표시
+
+상대방이 입력 중일 때 "작성 중..." 같은 표시를 띄우기 위한 이벤트예요.
+
+**보내는 이벤트**: `typing` — 입력을 시작했을 때
+
+```json
+{ "roomId": 5 }
+```
+
+**보내는 이벤트**: `stop_typing` — 입력을 멈췄을 때 (마지막 입력 후 2~3초 지나면 프론트에서 debounce로 보내는 걸 추천해요)
+
+```json
+{ "roomId": 5 }
+```
+
+**받는 이벤트**: `user_typing` — 상대방이 입력 중일 때 (본인은 못 받아요)
+
+```json
+{ "userId": 2 }
+```
+
+**받는 이벤트**: `user_stop_typing` — 상대방이 입력을 멈췄을 때
+
+```json
+{ "userId": 2 }
+```
+
+---
+
+### 6-5. 플러터 연동 가이드
+
+채팅 화면 하나를 통째로 구현할 때 참고할 수 있게, 전체 흐름을 순서대로 정리했어요.
+
+**패키지 설치**
+
+```yaml
+dependencies:
+  socket_io_client: ^2.0.3+1
+```
+
+**1) 채팅방 목록 화면 (5-1 API로 조회)**
+
+`GET /rooms`로 목록을 받아서 리스트로 뿌리고, 방 하나를 탭하면 채팅방 화면으로 이동하면서 `roomId`를 넘겨주면 돼요. 이때 소켓 연결은 하지 않아도 돼요 — 목록 조회는 REST라 소켓이 필요 없어요.
+
+**2) 채팅방 화면 진입 시 — 소켓 연결 + 방 입장**
+
+```dart
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+
+class ChatRoomController {
+  late IO.Socket socket;
+  final int roomId;
+  final String jwtToken;
+
+  ChatRoomController({required this.roomId, required this.jwtToken});
+
+  void connect() {
+    socket = IO.io(
+      'http://localhost:3000',
+      IO.OptionBuilder()
+        .setTransports(['websocket'])
+        .setAuth({'token': jwtToken})
+        .build(),
+    );
+
+    socket.connect();
+
+    socket.onConnect((_) {
+      socket.emit('join_room', roomId);
+    });
+
+    // 채팅방 상단 헤더 (상대방 이름, 온도, 상품 이미지)
+    socket.on('room_info', (data) {
+      // setState로 헤더 UI 업데이트
+      // data['counterpartName'], data['counterpartTemperatureLevel'], data['productImg']
+    });
+
+    // 이전 대화 내역 (화면 진입 시 한 번)
+    socket.on('chat_history', (data) {
+      // List<dynamic> data — 메시지 리스트로 렌더링
+      // 각 항목: data[i]['message'], data[i]['timeDisplay']
+    });
+
+    // 실시간 새 메시지
+    socket.on('receive_message', (data) {
+      // 리스트 맨 아래에 새 메시지 추가
+      // data['message'], data['timeDisplay'], data['userId']
+    });
+
+    // 상대방 작성 중 표시
+    socket.on('user_typing', (data) {
+      // "작성 중..." 표시 ON
+    });
+
+    socket.on('user_stop_typing', (data) {
+      // "작성 중..." 표시 OFF
+    });
+
+    socket.onConnectError((err) {
+      // 토큰 만료/무효 시 여기로 옴 — 로그인 화면으로 리다이렉트 처리 추천
+    });
+  }
+
+  void sendMessage(String text) {
+    socket.emit('send_message', {'roomId': roomId, 'message': text});
+  }
+
+  void notifyTyping() {
+    socket.emit('typing', {'roomId': roomId});
+  }
+
+  void notifyStopTyping() {
+    socket.emit('stop_typing', {'roomId': roomId});
+  }
+
+  void disconnect() {
+    socket.disconnect();
+  }
+}
+```
+
+**3) 입력창에 타이핑 감지 붙이기 (debounce)**
+
+매 글자마다 `typing`을 보내면 트래픽이 많아지니, 타이머로 묶어서 보내는 걸 추천해요.
+
+```dart
+Timer? _typingTimer;
+
+void onTextChanged(String text) {
+  controller.notifyTyping();
+
+  _typingTimer?.cancel();
+  _typingTimer = Timer(const Duration(seconds: 2), () {
+    controller.notifyStopTyping();
+  });
+}
+```
+
+**4) 화면 나갈 때**
+
+```dart
+@override
+void dispose() {
+  controller.disconnect();
+  super.dispose();
+}
+```
+
+**전체 흐름 요약**
+
+1. 채팅방 목록 화면: `GET /rooms` (REST)
+2. "채팅하기" 버튼 or 목록에서 방 선택: `POST /rooms`로 roomId 획득 (신규 진입 시) 또는 목록의 roomId 그대로 사용
+3. 채팅방 화면 진입: 소켓 연결 → `join_room` emit → `room_info`, `chat_history` 수신해서 화면 초기화
+4. 메시지 입력 중: `typing`/`stop_typing` emit (debounce 적용)
+5. 메시지 전송: `send_message` emit → 모든 참여자가 `receive_message`로 수신
+6. 화면 나가기: 소켓 연결 해제
+
+**주의할 점**
+
+- 소켓은 채팅방 화면에 들어갈 때 연결하고, 나갈 때 반드시 `disconnect()` 해주세요. 여러 채팅방을 오갈 때 이전 연결을 안 끊으면 중복 연결/중복 수신 문제가 생겨요.
+- JWT가 만료된 상태로 소켓 연결을 시도하면 `onConnectError`로 걸려요. REST API와 마찬가지로 401 처리(로그인 화면 이동)를 여기서도 해주셔야 해요.
 
 ---
 
 ## 7. 이메일 인증 (Email Verification)
 
-가입 절차상 구현은 되어있고, **테스트 편의를 위해 지금은 회원가입 시 자동으로 인증된 상태(`is_verified = true`)로 처리** 
+가입 절차상 구현은 되어있고, **테스트 편의를 위해 지금은 회원가입 시 자동으로 인증된 상태(`is_verified = true`)로 처리** 중이에요. 실제 이메일 인증 플로우를 프론트에 붙이실 때 알려주시면 라우트 목록 정리해서 다시 공유해드릴게요.
+
+---
+
+## 8. 프로필 (Profile)
+
+### 8-1. 내 프로필 조회
+
+`GET /users/me`
+
+**응답 (200)**
+
+```json
+{
+  "data": {
+    "name": "test",
+    "img": "profile.jpg",
+    "temperature": 65,
+    "temperatureLevel": "warm",
+    "point": 1200,
+    "totalEarnedPoint": 3400,
+    "boughtCount": 5,
+    "soldCount": 8,
+    "co2SavedKg": 412.5
+  }
+}
+```
+
+- `temperatureLevel`: 상품 상세와 동일하게 서버에서 단계 계산해서 내려줘요 (`"cold"` / `"normal"` / `"warm"` / `"hot"`)
+- `totalEarnedPoint`: 지금까지 판매로 벌어들인 포인트 누적값
+- `boughtCount` / `soldCount`: 완료된 거래(`trades.status = 'completed'`) 기준 구매/판매 건수
+- `co2SavedKg`: 완료된 거래(구매+판매 합산)를 카테고리별 절감 가중치로 환산한 **추정치**예요. 실제 측정값이 아니라 대략적인 참고 수치라, 프론트에서 노출하실 때 "약 OOkg 절약" 정도로 표현해주시면 좋을 것 같아요.
+
+---
+
+## 9. 검색 (Search)
+
+### 9-1. 상품 검색 O
+
+`GET /search`
+
+요청 시 검색어가 자동으로 로그에 기록돼요 (9-3 최근 검색어에 반영됨).
+
+**요청** — 쿼리 파라미터
+
+```
+GET /search?keyword=아이폰
+```
+
+**응답 (200)**
+
+```json
+{
+  "data": [
+    {
+      "id": 5,
+      "title": "아이폰 13 팝니다",
+      "type": "general",
+      "price": 500000,
+      "img": "url1"
+    },
+    {
+      "id": 9,
+      "title": "아이폰 케이스",
+      "type": "point",
+      "price": 500,
+      "img": "url2"
+    }
+  ]
+}
+```
+
+- 일반/포인트/경매 상품이 전부 섞여서 나와요. `type`으로 구분해서 카드 UI 분기하시면 돼요.
+- 경매(`auction`) 상품은 고정가가 없어서 `price`가 `null`로 와요.
+
+**실패 케이스**
+| 상태코드 | 상황 |
+|---|---|
+| 400 | `keyword` 누락 |
+
+---
+
+### 9-2. 이번 달 인기 검색어 TOP 5 O
+
+`GET /search/popular`
+
+로그인 없이도 조회 가능해요.
+
+**응답 (200)**
+
+```json
+{
+  "data": ["아이폰", "노트북", "자전거", "캠핑용품", "에어팟"]
+}
+```
+
+> 이번 달 검색 로그가 5개 미만이면 그보다 적게 나올 수 있어요 (정상 동작).
+
+---
+
+### 9-3. 최근 검색어 조회
+
+`GET /search/recent`
+
+내가 검색했던 키워드를 최근 순으로 보여줘요 (같은 키워드는 최신 1건만).
+
+**응답 (200)**
+
+```json
+{
+  "data": [
+    {
+      "searchId": 3,
+      "title": "아이폰",
+      "lastSearchedAt": "2026-08-04T10:00:00"
+    },
+    {
+      "searchId": 1,
+      "title": "노트북",
+      "lastSearchedAt": "2026-08-03T15:20:00"
+    }
+  ]
+}
+```
+
+### 9-4. 최근 검색어 개별 삭제
+
+`DELETE /search/recent/:searchId`
+
+X 버튼 눌러서 최근 검색어 목록에서 하나만 지울 때 사용해요. 이 검색어에 대한 **내 검색 기록만** 지워지고, 인기 검색어 통계(9-2)엔 영향 없어요.
+
+예: `DELETE /search/recent/3`
+
+**응답 (200)**
+
+```json
+{ "message": "Search history deleted successfully." }
+```
+
+**실패 케이스**
+| 상태코드 | 상황 |
+|---|---|
+| 404 | 해당 검색 기록이 없음 |
 
 ---
 
 ## 아직 준비 중인 기능
 
 - 경매 상세 페이지 API (디자인 확정 대기)
+
+궁금한 거나 응답 형식 바꾸고 싶은 거 있으면 언제든 얘기해주세요!
+s
