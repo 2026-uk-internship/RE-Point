@@ -531,7 +531,18 @@ socket.connect();
 
 (방(room) id 하나만 숫자로 전송 — 5번 채팅방 API로 받은 `roomId`)
 
-**받는 이벤트**: `chat_history` — 입장하면 이전 대화 내역을 배열로 받아요.
+**받는 이벤트 1**: `room_info` — 채팅방 상단 헤더용 정보예요.
+
+```json
+{
+  "counterpartName": "seller01",
+  "counterpartTemperature": 65,
+  "counterpartTemperatureLevel": "warm",
+  "productImg": "product_url.jpg"
+}
+```
+
+**받는 이벤트 2**: `chat_history` — 이전 대화 내역을 배열로 받아요.
 
 ```json
 [
@@ -540,10 +551,13 @@ socket.connect();
     "user_id": 2,
     "user_name": "seller01",
     "message": "안녕하세요",
-    "date": "2026-08-01T10:00:00"
+    "date": "2026-08-01T10:00:00",
+    "timeDisplay": "10:00 AM"
   }
 ]
 ```
+
+- `timeDisplay`: 화면에 바로 표시할 수 있는 `hh:mm AM/PM` 형식이에요. 원본 `date`도 같이 오니, 날짜 구분(오늘/어제 등)이 필요하면 `date`를 활용하시면 돼요.
 
 ### 6-3. 메시지 보내기
 
@@ -561,9 +575,173 @@ socket.connect();
   "roomId": 5,
   "userId": 3,
   "message": "네고 가능할까요?",
-  "date": "2026-08-02T14:20:00"
+  "date": "2026-08-02T14:20:00",
+  "timeDisplay": "02:20 PM"
 }
 ```
+
+### 6-4. 작성 중 표시
+
+상대방이 입력 중일 때 "작성 중..." 같은 표시를 띄우기 위한 이벤트예요.
+
+**보내는 이벤트**: `typing` — 입력을 시작했을 때
+
+```json
+{ "roomId": 5 }
+```
+
+**보내는 이벤트**: `stop_typing` — 입력을 멈췄을 때 (마지막 입력 후 2~3초 지나면 프론트에서 debounce로 보내는 걸 추천해요)
+
+```json
+{ "roomId": 5 }
+```
+
+**받는 이벤트**: `user_typing` — 상대방이 입력 중일 때 (본인은 못 받아요)
+
+```json
+{ "userId": 2 }
+```
+
+**받는 이벤트**: `user_stop_typing` — 상대방이 입력을 멈췄을 때
+
+```json
+{ "userId": 2 }
+```
+
+---
+
+### 6-5. 플러터 연동 가이드
+
+채팅 화면 하나를 통째로 구현할 때 참고할 수 있게, 전체 흐름을 순서대로 정리했어요.
+
+**패키지 설치**
+
+```yaml
+dependencies:
+  socket_io_client: ^2.0.3+1
+```
+
+**1) 채팅방 목록 화면 (5-1 API로 조회)**
+
+`GET /rooms`로 목록을 받아서 리스트로 뿌리고, 방 하나를 탭하면 채팅방 화면으로 이동하면서 `roomId`를 넘겨주면 돼요. 이때 소켓 연결은 하지 않아도 돼요 — 목록 조회는 REST라 소켓이 필요 없어요.
+
+**2) 채팅방 화면 진입 시 — 소켓 연결 + 방 입장**
+
+```dart
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+
+class ChatRoomController {
+  late IO.Socket socket;
+  final int roomId;
+  final String jwtToken;
+
+  ChatRoomController({required this.roomId, required this.jwtToken});
+
+  void connect() {
+    socket = IO.io(
+      'http://localhost:3000',
+      IO.OptionBuilder()
+        .setTransports(['websocket'])
+        .setAuth({'token': jwtToken})
+        .build(),
+    );
+
+    socket.connect();
+
+    socket.onConnect((_) {
+      socket.emit('join_room', roomId);
+    });
+
+    // 채팅방 상단 헤더 (상대방 이름, 온도, 상품 이미지)
+    socket.on('room_info', (data) {
+      // setState로 헤더 UI 업데이트
+      // data['counterpartName'], data['counterpartTemperatureLevel'], data['productImg']
+    });
+
+    // 이전 대화 내역 (화면 진입 시 한 번)
+    socket.on('chat_history', (data) {
+      // List<dynamic> data — 메시지 리스트로 렌더링
+      // 각 항목: data[i]['message'], data[i]['timeDisplay']
+    });
+
+    // 실시간 새 메시지
+    socket.on('receive_message', (data) {
+      // 리스트 맨 아래에 새 메시지 추가
+      // data['message'], data['timeDisplay'], data['userId']
+    });
+
+    // 상대방 작성 중 표시
+    socket.on('user_typing', (data) {
+      // "작성 중..." 표시 ON
+    });
+
+    socket.on('user_stop_typing', (data) {
+      // "작성 중..." 표시 OFF
+    });
+
+    socket.onConnectError((err) {
+      // 토큰 만료/무효 시 여기로 옴 — 로그인 화면으로 리다이렉트 처리 추천
+    });
+  }
+
+  void sendMessage(String text) {
+    socket.emit('send_message', {'roomId': roomId, 'message': text});
+  }
+
+  void notifyTyping() {
+    socket.emit('typing', {'roomId': roomId});
+  }
+
+  void notifyStopTyping() {
+    socket.emit('stop_typing', {'roomId': roomId});
+  }
+
+  void disconnect() {
+    socket.disconnect();
+  }
+}
+```
+
+**3) 입력창에 타이핑 감지 붙이기 (debounce)**
+
+매 글자마다 `typing`을 보내면 트래픽이 많아지니, 타이머로 묶어서 보내는 걸 추천해요.
+
+```dart
+Timer? _typingTimer;
+
+void onTextChanged(String text) {
+  controller.notifyTyping();
+
+  _typingTimer?.cancel();
+  _typingTimer = Timer(const Duration(seconds: 2), () {
+    controller.notifyStopTyping();
+  });
+}
+```
+
+**4) 화면 나갈 때**
+
+```dart
+@override
+void dispose() {
+  controller.disconnect();
+  super.dispose();
+}
+```
+
+**전체 흐름 요약**
+
+1. 채팅방 목록 화면: `GET /rooms` (REST)
+2. "채팅하기" 버튼 or 목록에서 방 선택: `POST /rooms`로 roomId 획득 (신규 진입 시) 또는 목록의 roomId 그대로 사용
+3. 채팅방 화면 진입: 소켓 연결 → `join_room` emit → `room_info`, `chat_history` 수신해서 화면 초기화
+4. 메시지 입력 중: `typing`/`stop_typing` emit (debounce 적용)
+5. 메시지 전송: `send_message` emit → 모든 참여자가 `receive_message`로 수신
+6. 화면 나가기: 소켓 연결 해제
+
+**주의할 점**
+
+- 소켓은 채팅방 화면에 들어갈 때 연결하고, 나갈 때 반드시 `disconnect()` 해주세요. 여러 채팅방을 오갈 때 이전 연결을 안 끊으면 중복 연결/중복 수신 문제가 생겨요.
+- JWT가 만료된 상태로 소켓 연결을 시도하면 `onConnectError`로 걸려요. REST API와 마찬가지로 401 처리(로그인 화면 이동)를 여기서도 해주셔야 해요.
 
 ---
 
@@ -600,10 +778,12 @@ socket.connect();
 - `temperatureLevel`: 상품 상세와 동일하게 서버에서 단계 계산해서 내려줘요 (`"cold"` / `"normal"` / `"warm"` / `"hot"`)
 - `totalEarnedPoint`: 지금까지 판매로 벌어들인 포인트 누적값
 - `boughtCount` / `soldCount`: 완료된 거래(`trades.status = 'completed'`) 기준 구매/판매 건수
-- `co2SavedKg`: 완료된 거래(구매+판매 합산)를 카테고리별 절감 가중치로 환산한 **추정치** 실제 측정값이 아니라 대략적인 참고 수치라, 프론트에서 노출하실 때 "약 OOkg 절약" 정도로 표현
+- `co2SavedKg`: 완료된 거래(구매+판매 합산)를 카테고리별 절감 가중치로 환산한 **추정치**예요. 실제 측정값이 아니라 대략적인 참고 수치라, 프론트에서 노출하실 때 "약 OOkg 절약" 정도로 표현해주시면 좋을 것 같아요.
 
 ---
 
 ## 아직 준비 중인 기능
 
 - 경매 상세 페이지 API (디자인 확정 대기)
+
+궁금한 거나 응답 형식 바꾸고 싶은 거 있으면 언제든 얘기해주세요!
