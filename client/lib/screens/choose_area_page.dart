@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'pick_interests_page.dart';
-import 'onboarding_step_header.dart';
+import '../widgets/onboarding_step_header.dart';
 
 class ChooseAreaPage extends StatefulWidget {
   const ChooseAreaPage({super.key});

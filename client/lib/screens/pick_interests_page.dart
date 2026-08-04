@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'onboarding_step_header.dart';
+import '../widgets/onboarding_step_header.dart';
+import 'main_page.dart';
 
 class PickInterestsPage extends StatefulWidget {
   const PickInterestsPage({super.key});
@@ -60,7 +61,12 @@ class _PickInterestsPageState extends State<PickInterestsPage> {
               currentStep: 3,
               title: "Pick your interests",
               onNext: () {
-                // TODO: 다음 화면(예: 홈)으로 이동 또는 온보딩 종료 처리
+                // 온보딩 마지막 단계 -> 메인 화면으로 이동 (뒤로가기로 온보딩에 못 돌아오도록 스택 교체)
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MainPage()),
+                  (route) => false,
+                );
               },
             ),
             Padding(

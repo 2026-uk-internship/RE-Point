@@ -12,7 +12,6 @@ class ChatColors {
     Color(0xFF3A2A5E),
     Color(0xFF1C1330),
   ];
-  
 
   static const Color topBarBackground = Color(0xFF241A3D);
   static const Color cardBackground = Color(0xFF2A2049);
