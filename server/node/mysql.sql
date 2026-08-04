@@ -331,7 +331,7 @@ CREATE TABLE posts (
     user_id INTEGER,
 
     FOREIGN KEY (user_id) REFERENCES users(id)
-        ON DELETE NOT NULL
+        ON DELETE SET NULL
         ON UPDATE CASCADE
 );
 
@@ -342,7 +342,7 @@ CREATE TABLE comments (
     post_id INTEGER NOT NULL,
 
     FOREIGN KEY (user_id) REFERENCES users(id)
-        ON DELETE NOT NULL
+        ON DELETE SET NULL
         ON UPDATE CASCADE,
     FOREIGN KEY (post_id) REFERENCES posts(id)
         ON DELETE CASCADE

@@ -100,3 +100,9 @@ exports.isEmailVerified = async (email) => {
   );
   return rows.length > 0;
 };
+
+exports.updateLastActive = async (userId) => {
+  await pool.query(`UPDATE users SET last_active_at = NOW() WHERE id = ?`, [
+    userId,
+  ]);
+};

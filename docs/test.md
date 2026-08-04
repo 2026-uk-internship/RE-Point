@@ -1,12 +1,22 @@
 # RE-Point API 문서
 
-베이스 URL: `http://localhost:3000`
+베이스 URL: `http://localhost:3000` (배포 서버 주소는 별도 공유)
 
 ## 공통 사항
 
 - 인증 필요 API: `Authorization: Bearer {token}`
 - Body는 `Content-Type: application/json` (이미지 업로드는 `multipart/form-data`)
 - 에러 응답: `{ "message": "에러 설명" }`
+
+## 테스트 도구
+
+`api-tester.html` 파일을 브라우저로 열면 아래 모든 API를 버튼 클릭만으로 테스트해볼 수 있어요.
+
+1. 상단 Base URL을 서버 주소로 맞추기
+2. 회원가입 → 로그인 (로그인하면 토큰이 자동 저장되고, 이후 인증 필요 기능에 자동으로 붙음)
+3. 각 카드 버튼 클릭 → 실제 요청/응답을 그대로 확인 가능
+
+플러터에서 각 기능 붙이기 전에, 이 도구로 먼저 요청/응답 모양을 직접 눌러보면서 확인하는 걸 추천해요.
 
 ---
 
@@ -262,13 +272,36 @@
 
 `PUT /users/me/profile-image` (multipart/form-data, 필드명 `image`)
 
+### 다른 사용자 프로필 조회
+
+`GET /users/:id/profile` (인증 불필요)
+
+```json
+{
+  "name": "...",
+  "img": "...",
+  "temperature": 72,
+  "temperatureLevel": "warm",
+  "lastActiveHoursAgo": "3시간 전",
+  "categories": ["Electronics", "Books & Stationery"],
+  "sellingProducts": [
+    { "id": 5, "title": "...", "price": 500000, "img": "url1" }
+  ],
+  "auctionProducts": [
+    { "id": 9, "title": "...", "highestPoint": 1500, "img": "url3" }
+  ]
+}
+```
+
+판매중(`sale`)인 일반/포인트 상품, 종료 안 된 경매만 포함. `categories`는 관심 카테고리. `lastActiveHoursAgo`는 인증 요청 시마다(5분 간격) 자동 갱신.
+
 ---
 
 ## 9. 지역
 
 ### 지역 목록
 
-`GET /locations` — 영국 자치구 단위(Camden, Westminster 등)
+`GET /locations` — 영국 자치구 단위(Camden, Westminster 등). 응답의 `id`를 그대로 아래 설정 API에 사용 (id가 1부터 시작하지 않을 수 있음 — 항상 이 목록 조회 결과 기준으로 사용)
 
 ### 내 지역 설정
 
