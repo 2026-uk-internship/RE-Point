@@ -54,3 +54,7 @@ exports.updateLocation = async (userId, locationId) => {
   );
   return result.affectedRows;
 };
+
+exports.updateProfileImage = async (userId, imgUrl) => {
+  await pool.query(`UPDATE users SET img = ? WHERE id = ?`, [imgUrl, userId]);
+};

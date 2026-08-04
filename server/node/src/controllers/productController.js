@@ -2,7 +2,7 @@ const productModel = require("../models/productModel");
 
 exports.createProduct = async (req, res) => {
   try {
-    const userId = req.user.id; // JWT 미들웨어에서 심어준 값
+    const userId = req.user.id;
     const {
       title,
       description,
@@ -13,39 +13,15 @@ exports.createProduct = async (req, res) => {
       location,
       latitude,
       longitude,
-      images,
       auction,
     } = req.body;
 
-    // 공통 필수값 체크
     if (!title || !type || !location || latitude == null || longitude == null) {
       return res.status(400).json({ message: "Required fields are missing." });
     }
 
-    if (!["general", "point", "auction"].includes(type)) {
-      return res.status(400).json({ message: "Invalid product type." });
-    }
-
-    // 타입별 필수값 체크
-    if (type === "general" && !money_price) {
-      return res
-        .status(400)
-        .json({ message: "money_price is required for general type." });
-    }
-    if (type === "point" && !point_price) {
-      return res
-        .status(400)
-        .json({ message: "point_price is required for point type." });
-    }
-    if (
-      type === "auction" &&
-      (!auction || !auction.start_point || !auction.end_date)
-    ) {
-      return res.status(400).json({
-        message:
-          "auction.start_point and auction.end_date are required for auction type.",
-      });
-    }
+    // multer가 업로드된 파일들을 req.files에 담아줌 — 각 파일의 Cloudinary URL은 file.path
+    const imageUrls = (req.files || []).map((file) => file.path);
 
     const productId = await productModel.createProduct(userId, {
       title,
@@ -57,7 +33,7 @@ exports.createProduct = async (req, res) => {
       location,
       latitude,
       longitude,
-      images,
+      images: imageUrls, // 기존 모델 코드 그대로 재사용 가능
       auction,
     });
 
