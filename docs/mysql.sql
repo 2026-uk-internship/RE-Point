@@ -3,11 +3,10 @@ USE repoint;
 SHOW TABLES;
 
 
-# USER AND GRANT 
+# USER AND GRANT
 CREATE USER 'repoint_user'@'localhost' IDENTIFIED BY 'helloworld';
-CREATE USER '아이디'@'접속위치' IDENTIFIED BY '비밀번호';
 
-GRANT ALL PRIVILEGES ON repoint.* 
+GRANT ALL PRIVILEGES ON repoint.*
 TO 'repoint_user'@'localhost';
 
 FLUSH PRIVILEGES;
@@ -31,19 +30,17 @@ CREATE TABLE users (
     point INTEGER DEFAULT 100 CHECK (point >= 0),
     location_id INTEGER,
     temperature INTEGER DEFAULT 0,
-    
+
     FOREIGN KEY (id) REFERENCES auth(id)
-		ON DELETE CASCADE 
+		ON DELETE CASCADE
 		ON UPDATE CASCADE,
     FOREIGN KEY (location_id) REFERENCES location(id)
-		ON DELETE CASCADE 
+		ON DELETE CASCADE
 		ON UPDATE CASCADE
 );
 
 CREATE TABLE location (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    country VARCHAR(255) NOT NULL,
-    region VARCHAR(255) NOT NULL,
     city VARCHAR(255) NOT NULL
 );
 
@@ -54,10 +51,10 @@ CREATE TABLE point_history (
     type ENUM('earn_sale', 'spend_purchase', 'charge', 'auction_win') NOT NULL,
     related_id INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
+
     FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE SET NULL		# 서버에서 NULL일 경우, '탈퇴한 사용자'
-        ON UPDATE CASCADE 
+        ON UPDATE CASCADE
 );
 
 CREATE TABLE products (
@@ -70,11 +67,11 @@ CREATE TABLE products (
     type ENUM('general', 'point', 'auction') NOT NULL,
     category_id INTEGER,
     location VARCHAR(255) NOT NULL,
-    latitude DECIMAL(10, 7) NOT NULL, 
-    longitude DECIMAL(10, 7) NOT NULL, 
+    latitude DECIMAL(10, 7) NOT NULL,
+    longitude DECIMAL(10, 7) NOT NULL,
     status ENUM('sale', 'reserved', 'sold') DEFAULT 'sale',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
+
     FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE,
@@ -83,15 +80,15 @@ CREATE TABLE products (
         ON UPDATE RESTRICT
 );
 
-CREATE TABLE trades ( 
+CREATE TABLE trades (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    product_id INTEGER NOT NULL, 
+    product_id INTEGER NOT NULL,
     buyer_id INTEGER,
     seller_id INTEGER,
     status ENUM('requested', 'accepted', 'rejected', 'completed', 'canceled') DEFAULT 'requested',
     requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME,
-    
+
     FOREIGN KEY (product_id) REFERENCES products(id),
     FOREIGN KEY (buyer_id) REFERENCES users(id)
 		ON DELETE SET NULL		# 만약 거래 중에 회원 탈퇴를 요청할 경우, 서버에서 거부 메시지 / if null -> 'deleted user'
@@ -107,7 +104,7 @@ CREATE TABLE auction (
     end_date DATETIME NOT NULL,
     highest_user INTEGER,
     highest_point INTEGER NOT NULL,
-    
+
     FOREIGN KEY (product_id) REFERENCES products(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE,
@@ -122,20 +119,20 @@ CREATE TABLE bids (
     user_id INTEGER,
     point INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
+
     FOREIGN KEY (auction_id) REFERENCES auction(product_id)
 		ON DELETE CASCADE
-        ON UPDATE CASCADE, 
+        ON UPDATE CASCADE,
 	FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE SET NULL
         ON UPDATE CASCADE
 );
-    
+
 CREATE TABLE product_images (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
     img VARCHAR(255) NOT NULL,
     product_id INTEGER,
-    
+
     FOREIGN KEY (product_id) REFERENCES products(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE
@@ -144,7 +141,8 @@ CREATE TABLE product_images (
 CREATE TABLE category (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL UNIQUE,
-    point_rate DECIMAL(10, 2) NOT NULL
+    point_rate DECIMAL(10, 2) NOT NULL,
+    co2_saved DECIMAL(10, 2) DEFAULT 0            -- 변경: 탄소 절감량 추정 가중치 (kg CO2)
 );
 
 CREATE TABLE user_category (
@@ -152,7 +150,7 @@ CREATE TABLE user_category (
     user_id INTEGER NOT NULL,
     category_id INTEGER NOT NULL,
     UNIQUE (user_id, category_id),
-    
+
     FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE,
@@ -172,7 +170,7 @@ CREATE TABLE user_search_logs (
     user_id INTEGER,
     search_id INTEGER,
     date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
+
     FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE SET NULL
         ON UPDATE CASCADE,
@@ -185,14 +183,14 @@ CREATE TABLE favorites (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
     user_id INTEGER,
     product_id INTEGER,
-    
+
     FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE,
-        
+
 	UNIQUE(user_id, product_id)
 );
 
@@ -201,7 +199,7 @@ CREATE TABLE view_product (
     user_id INTEGER,
     product_id INTEGER,
 	date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
+
     FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE,
@@ -213,9 +211,9 @@ CREATE TABLE view_product (
 CREATE TABLE rooms (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
     seller INTEGER,
-    buyer INTEGER, 
+    buyer INTEGER,
     product_id INTEGER,
-    
+
     FOREIGN KEY (seller) REFERENCES users(id)
 		ON DELETE SET NULL
         ON UPDATE CASCADE,
@@ -233,7 +231,7 @@ CREATE TABLE chats (
     user_id INTEGER,
     message TEXT NOT NULL,
     date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
+
 	FOREIGN KEY (room_id) REFERENCES rooms(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE,
@@ -241,7 +239,7 @@ CREATE TABLE chats (
 		ON DELETE SET NULL
         ON UPDATE CASCADE
 );
-        
+
 CREATE TABLE coupons (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
     title VARCHAR(255) NOT NULL,
@@ -261,7 +259,7 @@ CREATE TABLE coupon_user (
     is_used BOOLEAN DEFAULT FALSE,
     issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME,
-    
+
     FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE,
@@ -275,7 +273,7 @@ CREATE TABLE notifications (
     user_id INTEGER,
     message VARCHAR(255) NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
-    
+
     FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE
@@ -283,19 +281,19 @@ CREATE TABLE notifications (
 
 CREATE TABLE review (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    seller_id INTEGER, 
+    seller_id INTEGER,
     buyer_id INTEGER,
     product_id INTEGER,
-    comment TEXT, 
+    comment TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
+
     FOREIGN KEY (seller_id) REFERENCES users(id)
 		ON DELETE SET NULL
         ON UPDATE CASCADE,
 	FOREIGN KEY (buyer_id) REFERENCES users(id)
 		ON DELETE SET NULL
         ON UPDATE CASCADE,
-	FOREIGN KEY (product_id) REFERENCES products(id) 
+	FOREIGN KEY (product_id) REFERENCES products(id)
 		ON DELETE CASCADE
         ON UPDATE CASCADE
 );
@@ -305,10 +303,10 @@ CREATE TABLE reports (
     user_id INTEGER,
     date DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('in_progress', 'end') DEFAULT 'in_progress',
-    type ENUM('user', 'chat', 'product') NOT NULL,
+    type ENUM('user', 'chat', 'product', 'review') NOT NULL,   -- 변경: review 추가
     contents TEXT,
     related_id INTEGER,
-    
+
     FOREIGN KEY (user_id) REFERENCES users(id)
 		ON DELETE SET NULL
         ON UPDATE CASCADE
@@ -322,4 +320,31 @@ CREATE TABLE email_verifications (
   is_verified TINYINT(1) DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_email_code (email, code)
+);
+
+CREATE TABLE posts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title TEXT NOT NULL,
+    contents TEXT,
+    date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    location VARCHAR(255),
+    user_id INTEGER,
+
+    FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE
+);
+
+CREATE TABLE comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    contents TEXT NOT NULL,
+    user_id INTEGER,
+    post_id INTEGER NOT NULL,
+
+    FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE,
+    FOREIGN KEY (post_id) REFERENCES posts(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
 );

@@ -13,5 +13,6 @@ router.put(
 );
 router.get("/me", verifyToken, userController.getMyProfile); // GET /users/me
 router.put("/me/location", verifyToken, userController.updateLocation); // PUT /users/me/location
+router.get("/:id/profile", userController.getPublicProfile); // GET /users/:id/profile
 
 module.exports = router;

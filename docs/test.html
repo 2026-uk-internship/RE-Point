@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>RE-Point API 테스터</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, "Segoe UI", sans-serif;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            color: #222;
+        }
+
+        h1 {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        h2 {
+            font-size: 15px;
+            margin: 0 0 10px;
+            color: #444;
+        }
+
+        .top-bar {
+            background: #fff;
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .top-bar input {
+            flex: 1;
+            min-width: 220px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+
+        .token-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: #eee;
+        }
+
+        .token-status.on {
+            background: #d1f5d3;
+            color: #1a7a1a;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 14px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 14px;
+        }
+
+        .card label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .card input,
+        .card select,
+        .card textarea {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 2px;
+            font-size: 13px;
+        }
+
+        .card button {
+            margin-top: 10px;
+            padding: 7px 14px;
+            border: none;
+            border-radius: 6px;
+            background: #333;
+            color: #fff;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .card button:hover {
+            background: #555;
+        }
+
+        .card button.secondary {
+            background: #eee;
+            color: #333;
+        }
+
+        pre {
+            background: #111;
+            color: #7bffb0;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            overflow-x: auto;
+            max-height: 220px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .row>* {
+            flex: 1;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>RE-Point API 테스터</h1>
+    <div class="top-bar">
+        <label style="font-size:13px;">Base URL</label>
+        <input id="baseUrl" value="http://localhost:3000" />
+        <span id="tokenStatus" class="token-status">토큰 없음</span>
+    </div>
+
+    <div class="grid">
+
+        <!-- 회원가입 -->
+        <div class="card">
+            <h2>1. 회원가입</h2>
+            <label>Username</label><input id="su-username" value="test1" />
+            <label>Email</label><input id="su-email" value="test1@test.com" />
+            <label>Password</label><input id="su-password" type="password" value="1234" />
+            <label>Password 확인</label><input id="su-repassword" type="password" value="1234" />
+            <label>Phone</label><input id="su-phone" value="01011112222" />
+            <button onclick="signup()">회원가입</button>
+            <pre id="out-signup"></pre>
+        </div>
+
+        <!-- 로그인 -->
+        <div class="card">
+            <h2>2. 로그인</h2>
+            <label>Email</label><input id="li-email" value="test1@test.com" />
+            <label>Password</label><input id="li-password" type="password" value="1234" />
+            <button onclick="login()">로그인 (토큰 저장)</button>
+            <pre id="out-login"></pre>
+        </div>
+
+        <!-- 카테고리 -->
+        <div class="card">
+            <h2>3. 카테고리</h2>
+            <button onclick="getCategories()">전체 목록 조회</button>
+            <pre id="out-category"></pre>
+        </div>
+
+        <!-- 지역 -->
+        <div class="card">
+            <h2>4. 지역</h2>
+            <button onclick="getLocations()">지역 목록 조회</button>
+            <label>내 지역으로 설정할 locationId</label><input id="loc-id" value="1" />
+            <button onclick="setLocation()">내 지역 설정</button>
+            <pre id="out-location"></pre>
+        </div>
+
+        <!-- 상품 목록 -->
+        <div class="card">
+            <h2>5. 상품 목록</h2>
+            <label>타입</label>
+            <select id="list-type">
+                <option value="general">일반거래</option>
+                <option value="point">포인트거래</option>
+                <option value="auctions">경매</option>
+            </select>
+            <label>정렬</label>
+            <select id="list-sort">
+                <option value="newest">최신순</option>
+                <option value="oldest">오래된순</option>
+                <option value="likes">좋아요순</option>
+                <option value="name">이름순</option>
+            </select>
+            <button onclick="getProductList()">목록 조회</button>
+            <pre id="out-list"></pre>
+        </div>
+
+        <!-- 상품 상세 -->
+        <div class="card">
+            <h2>6. 상품 상세 / 관련 상품</h2>
+            <label>Product ID</label><input id="detail-id" value="1" />
+            <div class="row">
+                <button onclick="getProductDetail()">상세 조회</button>
+                <button class="secondary" onclick="toggleFavorite()">찜 토글</button>
+            </div>
+            <div class="row">
+                <button class="secondary" onclick="getRelated('category')">같은 카테고리</button>
+                <button class="secondary" onclick="getRelated('seller')">같은 판매자</button>
+            </div>
+            <pre id="out-detail"></pre>
+        </div>
+
+        <!-- 검색 -->
+        <div class="card">
+            <h2>7. 검색</h2>
+            <label>키워드</label><input id="search-keyword" value="아이폰" />
+            <div class="row">
+                <button onclick="searchProducts()">상품 검색</button>
+                <button class="secondary" onclick="getPopularSearches()">인기 검색어</button>
+            </div>
+            <div class="row">
+                <button class="secondary" onclick="getRecentSearches()">최근 검색어</button>
+            </div>
+            <pre id="out-search"></pre>
+        </div>
+
+        <!-- 채팅방 -->
+        <div class="card">
+            <h2>8. 채팅방</h2>
+            <button onclick="getRooms()">내 채팅방 목록</button>
+            <label>채팅 시작할 Product ID</label><input id="room-product-id" value="1" />
+            <button class="secondary" onclick="createRoom()">채팅방 생성/입장</button>
+            <pre id="out-rooms"></pre>
+        </div>
+
+        <!-- 신고 -->
+        <div class="card">
+            <h2>9. 신고</h2>
+            <label>타입</label>
+            <select id="report-type">
+                <option value="product">product</option>
+                <option value="user">user</option>
+                <option value="chat">chat</option>
+                <option value="review">review</option>
+            </select>
+            <label>대상 ID (related_id)</label><input id="report-related-id" value="1" />
+            <label>사유</label><input id="report-contents" value="테스트 신고입니다" />
+            <button onclick="createReport()">신고 등록</button>
+            <pre id="out-report"></pre>
+        </div>
+
+        <!-- 프로필 -->
+        <div class="card">
+            <h2>10. 프로필</h2>
+            <button onclick="getProfile()">내 프로필 조회</button>
+            <label>다른 사용자 ID</label><input id="public-profile-id" value="2" />
+            <button class="secondary" onclick="getPublicProfile()">공개 프로필 조회</button>
+            <pre id="out-profile"></pre>
+        </div>
+
+        <!-- 게시판 -->
+        <div class="card">
+            <h2>11. 게시판</h2>
+            <label>제목</label><input id="post-title" value="테스트 게시글" />
+            <label>내용</label><input id="post-contents" value="내용입니다" />
+            <label>지역</label><input id="post-location" value="Camden" />
+            <div class="row">
+                <button onclick="createPost()">글 작성</button>
+                <button class="secondary" onclick="getPosts()">목록 조회</button>
+            </div>
+            <label>상세 조회할 Post ID</label><input id="post-id" value="1" />
+            <button class="secondary" onclick="getPostDetail()">상세 조회</button>
+            <pre id="out-post"></pre>
+        </div>
+
+    </div>
+
+    <script>
+        let token = null;
+
+        function base() {
+            return document.getElementById('baseUrl').value.replace(/\/$/, '');
+        }
+
+        function setToken(t) {
+            token = t;
+            const el = document.getElementById('tokenStatus');
+            if (t) {
+                el.textContent = '토큰 저장됨';
+                el.className = 'token-status on';
+            } else {
+                el.textContent = '토큰 없음';
+                el.className = 'token-status';
+            }
+        }
+
+        async function api(method, path, body, auth = false, isForm = false) {
+            const headers = {};
+            if (auth) {
+                if (!token) { alert('먼저 로그인해서 토큰을 받아주세요.'); throw new Error('no token'); }
+                headers['Authorization'] = 'Bearer ' + token;
+            }
+            let fetchBody = undefined;
+            if (body !== undefined) {
+                if (isForm) {
+                    fetchBody = body; // FormData
+                } else {
+                    headers['Content-Type'] = 'application/json';
+                    fetchBody = JSON.stringify(body);
+                }
+            }
+            const res = await fetch(base() + path, { method, headers, body: fetchBody });
+            let data;
+            try { data = await res.json(); } catch (e) { data = { raw: await res.text() }; }
+            return { status: res.status, data };
+        }
+
+        function show(id, result) {
+            document.getElementById(id).textContent = JSON.stringify(result, null, 2);
+        }
+
+        // 1. 회원가입
+        async function signup() {
+            const r = await api('POST', '/auth/signup', {
+                username: val('su-username'), email: val('su-email'),
+                password: val('su-password'), repassword: val('su-repassword'), phone: val('su-phone'),
+            });
+            show('out-signup', r);
+        }
+
+        // 2. 로그인
+        async function login() {
+            const r = await api('POST', '/auth/login', { email: val('li-email'), password: val('li-password') });
+            if (r.data && r.data.token) setToken(r.data.token);
+            show('out-login', r);
+        }
+
+        // 3. 카테고리
+        async function getCategories() {
+            show('out-category', await api('GET', '/category'));
+        }
+
+        // 4. 지역
+        async function getLocations() {
+            show('out-location', await api('GET', '/locations'));
+        }
+        async function setLocation() {
+            show('out-location', await api('PUT', '/users/me/location', { locationId: Number(val('loc-id')) }, true));
+        }
+
+        // 5. 상품 목록
+        async function getProductList() {
+            const type = val('list-type');
+            const sort = val('list-sort');
+            show('out-list', await api('GET', `/products/${type}?sort=${sort}`));
+        }
+
+        // 6. 상품 상세
+        async function getProductDetail() {
+            show('out-detail', await api('GET', `/products/${val('detail-id')}`));
+        }
+        async function toggleFavorite() {
+            show('out-detail', await api('POST', `/products/${val('detail-id')}/favorite`, {}, true));
+        }
+        async function getRelated(kind) {
+            show('out-detail', await api('GET', `/products/${val('detail-id')}/related-${kind}`));
+        }
+
+        // 7. 검색
+        async function searchProducts() {
+            show('out-search', await api('GET', `/search?keyword=${encodeURIComponent(val('search-keyword'))}`, undefined, true));
+        }
+        async function getPopularSearches() {
+            show('out-search', await api('GET', '/search/popular'));
+        }
+        async function getRecentSearches() {
+            show('out-search', await api('GET', '/search/recent', undefined, true));
+        }
+
+        // 8. 채팅방
+        async function getRooms() {
+            show('out-rooms', await api('GET', '/rooms', undefined, true));
+        }
+        async function createRoom() {
+            show('out-rooms', await api('POST', '/rooms', { productId: Number(val('room-product-id')) }, true));
+        }
+
+        // 9. 신고
+        async function createReport() {
+            show('out-report', await api('POST', '/report', {
+                type: val('report-type'), related_id: Number(val('report-related-id')), contents: val('report-contents'),
+            }, true));
+        }
+
+        // 10. 프로필
+        async function getProfile() {
+            show('out-profile', await api('GET', '/users/me', undefined, true));
+        }
+        async function getPublicProfile() {
+            show('out-profile', await api('GET', `/users/${val('public-profile-id')}/profile`));
+        }
+
+        // 11. 게시판
+        async function createPost() {
+            show('out-post', await api('POST', '/posts', {
+                title: val('post-title'), contents: val('post-contents'), location: val('post-location'),
+            }, true));
+        }
+        async function getPosts() {
+            show('out-post', await api('GET', '/posts'));
+        }
+        async function getPostDetail() {
+            show('out-post', await api('GET', `/posts/${val('post-id')}`));
+        }
+
+        function val(id) { return document.getElementById(id).value; }
+    </script>
+
+</body>
+
+</html>

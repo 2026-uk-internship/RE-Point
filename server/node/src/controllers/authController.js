@@ -103,6 +103,8 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Incorrect password." });
     }
 
+    await authModel.updateLastActive(user.id);
+
     const token = jwt.sign(
       { id: user.id, email: user.email },
       process.env.JWT_SECRET,
