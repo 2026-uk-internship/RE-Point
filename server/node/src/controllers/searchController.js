@@ -1,5 +1,4 @@
 const searchModel = require("../models/searchModel");
-const productModel = require("../models/productModel");
 
 exports.getRecentSearches = async (req, res) => {
   try {
@@ -46,8 +45,8 @@ exports.searchProducts = async (req, res) => {
 
     await searchModel.logSearch(req.user.id, keyword);
 
-    const products = await productModel.searchProducts(keyword);
-    return res.status(200).json({ data: products });
+    const result = await searchModel.searchProducts(keyword);
+    return res.status(200).json({ data: result });
   } catch (err) {
     console.error(err);
     return res
