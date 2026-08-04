@@ -41,8 +41,6 @@ CREATE TABLE users (
 
 CREATE TABLE location (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    country VARCHAR(255) NOT NULL,
-    region VARCHAR(255) NOT NULL,
     city VARCHAR(255) NOT NULL
 );
 
@@ -322,4 +320,31 @@ CREATE TABLE email_verifications (
   is_verified TINYINT(1) DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_email_code (email, code)
+);
+
+CREATE TABLE posts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title TEXT NOT NULL,
+    contents TEXT,
+    date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    location VARCHAR(255),
+    user_id INTEGER,
+
+    FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE NOT NULL
+        ON UPDATE CASCADE
+);
+
+CREATE TABLE comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    contents TEXT NOT NULL,
+    user_id INTEGER,
+    post_id INTEGER NOT NULL,
+
+    FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE NOT NULL
+        ON UPDATE CASCADE,
+    FOREIGN KEY (post_id) REFERENCES posts(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
 );
