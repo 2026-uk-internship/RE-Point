@@ -31,7 +31,15 @@ exports.findOrCreateRoom = async (productId, buyerId) => {
   return result.insertId;
 };
 
-exports.getRoomList = async (userId) => {
+exports.getRoomList = async (userId, keyword) => {
+  const conditions = ["(r.seller = ? OR r.buyer = ?)"];
+  const params = [userId, userId, userId, userId];
+
+  if (keyword) {
+    conditions.push("u.name LIKE ?");
+    params.push(`%${keyword}%`);
+  }
+
   const [rows] = await pool.query(
     `SELECT
        r.id AS roomId,
@@ -43,9 +51,9 @@ exports.getRoomList = async (userId) => {
        (SELECT c.date FROM chats c WHERE c.room_id = r.id ORDER BY c.date DESC LIMIT 1) AS lastMessageDate
      FROM rooms r
      JOIN users u ON u.id = (CASE WHEN r.seller = ? THEN r.buyer ELSE r.seller END)
-     WHERE r.seller = ? OR r.buyer = ?
+     WHERE ${conditions.join(" AND ")}
      ORDER BY lastMessageDate DESC`,
-    [userId, userId, userId, userId],
+    params,
   );
 
   const now = new Date();
@@ -66,4 +74,19 @@ exports.getRoomList = async (userId) => {
       lastMessageHoursAgo: hoursAgo !== null ? `${hoursAgo}시간 전` : null,
     };
   });
+};
+
+exports.getRoomInfo = async (roomId, userId) => {
+  const [rows] = await pool.query(
+    `SELECT
+       (CASE WHEN r.seller = ? THEN u2.name ELSE u1.name END) AS counterpartName,
+       (CASE WHEN r.seller = ? THEN u2.temperature ELSE u1.temperature END) AS counterpartTemperature,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = r.product_id ORDER BY pi.id ASC LIMIT 1) AS productImg
+     FROM rooms r
+     JOIN users u1 ON u1.id = r.seller
+     JOIN users u2 ON u2.id = r.buyer
+     WHERE r.id = ?`,
+    [userId, userId, roomId],
+  );
+  return rows[0];
 };

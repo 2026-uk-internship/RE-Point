@@ -30,7 +30,8 @@ exports.enterRoom = async (req, res) => {
 
 exports.getRoomList = async (req, res) => {
   try {
-    const rooms = await roomModel.getRoomList(req.user.id);
+    const { keyword } = req.query; // ?keyword=철수
+    const rooms = await roomModel.getRoomList(req.user.id, keyword);
     return res.status(200).json({ data: rooms });
   } catch (err) {
     console.error(err);

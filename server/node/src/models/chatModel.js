@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { formatTimeAMPM } = require("../utils/formatTime");
 
 exports.getMessagesByRoom = async (roomId) => {
   const [rows] = await pool.query(
@@ -9,7 +10,11 @@ exports.getMessagesByRoom = async (roomId) => {
      ORDER BY c.date ASC`,
     [roomId],
   );
-  return rows;
+
+  return rows.map((row) => ({
+    ...row,
+    timeDisplay: formatTimeAMPM(row.date), // "09:41 AM"
+  }));
 };
 
 exports.saveMessage = async ({ roomId, userId, message }) => {
