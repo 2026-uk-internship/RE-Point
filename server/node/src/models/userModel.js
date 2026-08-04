@@ -59,8 +59,6 @@ exports.updateProfileImage = async (userId, imgUrl) => {
   await pool.query(`UPDATE users SET img = ? WHERE id = ?`, [imgUrl, userId]);
 };
 
-const { getTemperatureLevel } = require("../utils/temperature");
-
 exports.getPublicProfile = async (userId) => {
   const [[user]] = await pool.query(
     `SELECT name, img, temperature, last_active_at FROM users WHERE id = ?`,
