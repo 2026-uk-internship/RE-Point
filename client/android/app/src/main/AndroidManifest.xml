@@ -3,6 +3,11 @@
         android:label="repoint"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+          <!-- Google Maps API Key 추가 -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyB8nVATslgTVGnqZdhH4rvHqDn4-saMRx0"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

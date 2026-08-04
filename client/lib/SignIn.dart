@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'MainPage.dart';
+import 'Create_account_page.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -10,230 +11,416 @@ class SignInPage extends StatefulWidget {
 
 class _SignInPageState extends State<SignInPage> {
   final controller = PageController();
-
+  int currentPage = 0;
   bool obscurePassword = true;
+
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    controller.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  void _goToPage(int page) {
+    controller.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  // 소셜 로그인 로고 이미지를 원형 아이콘 형태로 보여주는 헬퍼
+  Widget _socialImageIcon(String assetPath) {
+    return CircleAvatar(
+      radius: 26,
+      backgroundColor: Colors.white12,
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Image.asset(assetPath, fit: BoxFit.contain),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          PageView(
-            controller: controller,
-            children: [
-              // 첫 번째 페이지
-              Container(
-                width: double.infinity,
-                height: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color.fromRGBO(151, 154, 223, 1),
-                      Color.fromRGBO(77, 80, 165, 1),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-
-                child: Padding(
-                  padding: const EdgeInsets.all(30),
-
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 80),
-
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          "Ready for\nanother owner?",
-                          style: TextStyle(color: Colors.white, fontSize: 28),
-                        ),
-                      ),
-
-                      const Spacer(),
-
-                      Image.asset("images/BoxImage.png", width: 170),
-
-                      const Spacer(),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 두 번째 페이지
-              Container(
-                width: double.infinity,
-                height: double.infinity,
-
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color.fromRGBO(77, 80, 165, 1),
-                      Color.fromRGBO(10, 11, 36, 1),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-
-                child: Padding(
-                  padding: const EdgeInsets.all(30),
-
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 100),
-
-                      const Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          "Every item deserves\nanother chance.",
-                          textAlign: TextAlign.right,
-                          style: TextStyle(color: Colors.white, fontSize: 26),
-                        ),
-                      ),
-
-                      const Spacer(),
-
-                      const Text(
-                        "RE:point",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const Spacer(),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 로그인 페이지
-              Container(
-                width: double.infinity,
-                height: double.infinity,
-
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color.fromRGBO(151, 154, 223, 1),
-                      Color.fromRGBO(77, 80, 165, 1),
-                      Color.fromRGBO(10, 11, 36, 1),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 30),
-
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-
-                    children: [
-                      const Text(
-                        "Log in",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 38,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 40),
-
-                      TextField(
-                        style: const TextStyle(color: Colors.white),
-
-                        decoration: InputDecoration(
-                          hintText: "Username",
-
-                          hintStyle: const TextStyle(color: Colors.white70),
-
-                          filled: true,
-
-                          fillColor: Colors.white12,
-
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      TextField(
-                        obscureText: obscurePassword,
-
-                        style: const TextStyle(color: Colors.white),
-
-                        decoration: InputDecoration(
-                          hintText: "Password",
-
-                          hintStyle: const TextStyle(color: Colors.white70),
-
-                          filled: true,
-
-                          fillColor: Colors.white12,
-
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide.none,
-                          ),
-
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-
-                              color: Colors.white,
-                            ),
-
-                            onPressed: () {
-                              setState(() {
-                                obscurePassword = !obscurePassword;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 40),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // 페이지 표시
-          Positioned(
-            top: 60,
-            left: 30,
-            right: 30,
-
-            child: SmoothPageIndicator(
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            // 1. 메인 슬라이드 (PageView)
+            PageView(
               controller: controller,
+              onPageChanged: (index) {
+                setState(() => currentPage = index);
+              },
+              children: [
+                // 첫 번째 페이지
+                Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color.fromRGBO(151, 154, 223, 1),
+                        Color.fromRGBO(77, 80, 165, 1),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(30),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 80),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "Ready for\nanother owner?",
+                            style: TextStyle(color: Colors.white, fontSize: 28),
+                          ),
+                        ),
+                        const Spacer(),
+                        Align(
+                          alignment: const Alignment(0.4, 0),
+                          child: Image.asset("images/BoxImage.png", width: 170),
+                        ),
+                        const Spacer(),
+                      ],
+                    ),
+                  ),
+                ),
 
-              count: 3,
+                // 두 번째 페이지
+                Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: Stack(
+                    children: [
+                      // 기본 보라 배경
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Color.fromRGBO(77, 80, 165, 1),
+                              Color.fromRGBO(10, 11, 36, 1),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // 아래에서 검은색이 올라오는 오버레이
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.transparent,
+                              Color(0x6614091F),
+                              Color(0xCC14091F),
+                            ],
+                            stops: [0.0, 0.45, 0.75, 1.0],
+                          ),
+                        ),
+                      ),
+                      // 내용
+                      Padding(
+                        padding: const EdgeInsets.all(30),
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 100),
+                            const Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                "Every item deserves\nanother chance.",
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 26,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            const Text(
+                              "RE:point",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
 
-              effect: const ExpandingDotsEffect(
-                activeDotColor: Colors.white,
+                            const SizedBox(height: 40),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-                dotColor: Colors.white38,
+                // 세 번째 페이지 (로그인 페이지)
+                Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Color.fromRGBO(151, 154, 223, 1),
+                              Color.fromRGBO(77, 80, 165, 1),
+                              Color.fromRGBO(10, 11, 36, 1),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Color(0x6614091F),
+                              Color(0xCC14091F),
+                              Color(0xFF0A0B24),
+                            ],
+                            stops: [0.0, 0.25, 0.55, 1.0],
+                          ),
+                        ),
+                      ),
+                      // 내용
+                      SafeArea(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(horizontal: 30),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(height: 60),
+                              const Text(
+                                "Log in",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 38,
+                                ),
+                              ),
+                              const SizedBox(height: 40),
+                              const Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  "E-mail",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              // 이메일 입력창
+                              TextField(
+                                controller: emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: InputDecoration(
+                                  hintText: "Enter your E-mail",
+                                  hintStyle: const TextStyle(
+                                    color: Colors.white70,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white.withOpacity(0.08),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                    borderSide: const BorderSide(
+                                      color: Colors.white38,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                    borderSide: const BorderSide(
+                                      color: Colors.white,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              const Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  "Password",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              // 비밀번호 입력창
+                              TextField(
+                                controller: passwordController,
+                                obscureText: obscurePassword,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: InputDecoration(
+                                  hintText: "Enter your password",
+                                  hintStyle: const TextStyle(
+                                    color: Colors.white70,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white12,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      obscurePassword
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        obscurePassword = !obscurePassword;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 30),
+                              // 로그인 버튼
+                              SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color.fromRGBO(
+                                      10,
+                                      11,
+                                      36,
+                                      1,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => MainPage(),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text(
+                                    "Log in",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              // 회원가입 및 계정 찾기 링크
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const CreateAccountPage(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text(
+                                      "Create an account",
+                                      style: TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                    ),
+                                    child: Text(
+                                      "/",
+                                      style: TextStyle(color: Colors.white54),
+                                    ),
+                                  ),
+                                  const Text(
+                                    "Need help signing in?",
+                                    style: TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              // 소셜 로그인 아이콘 목록
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _socialImageIcon("images/google.png"),
+                                  _socialImageIcon("images/apple.png"),
+                                  _socialImageIcon("images/twitter.png"),
+                                ],
+                              ),
+                              const SizedBox(height: 30),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
 
-                dotHeight: 6,
-
-                dotWidth: 25,
+            // 2. 상단 인디케이터 바 (Overlay)
+            Positioned(
+              top: 70,
+              left: 20,
+              right: 20,
+              child: Row(
+                children: List.generate(3, (index) {
+                  final isActive = index == currentPage;
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: index < 2 ? 6 : 0),
+                      child: Container(
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: isActive ? Colors.white : Colors.white38,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
