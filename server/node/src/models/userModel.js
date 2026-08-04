@@ -47,7 +47,6 @@ exports.getProfile = async (userId) => {
   };
 };
 
-// src/models/userModel.js에 추가
 exports.updateLocation = async (userId, locationId) => {
   const [result] = await pool.query(
     `UPDATE users SET location_id = ? WHERE id = ?`,

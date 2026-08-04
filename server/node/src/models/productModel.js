@@ -168,7 +168,7 @@ exports.getProductDetail = async (productId) => {
     `SELECT
        p.id, p.title, p.description, p.money_price, p.point_price, p.type, p.created_at,
        u.name AS user_name, u.temperature,
-       loc.country, loc.region, loc.city,
+       loc.city,
        c.name AS category_name
      FROM products p
      JOIN users u ON u.id = p.user_id
@@ -199,7 +199,7 @@ exports.getProductDetail = async (productId) => {
     userName: product.user_name,
     temperature: product.temperature,
     temperatureLevel: getTemperatureLevel(product.temperature),
-    location: `${product.region} ${product.city}`,
+    location: product.city, // ← region/city 조합이 아니라 city 하나만 그대로 사용
     createdDaysAgo: `${diffDays}일`,
     category: product.category_name,
     images: images.map((row) => row.img),

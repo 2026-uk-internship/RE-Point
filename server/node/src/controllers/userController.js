@@ -17,7 +17,6 @@ exports.getMyProfile = async (req, res) => {
   }
 };
 
-// src/controllers/userController.js에 추가
 exports.updateLocation = async (req, res) => {
   try {
     const { locationId } = req.body;
