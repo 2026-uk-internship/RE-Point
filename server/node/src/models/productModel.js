@@ -168,8 +168,10 @@ exports.getProductDetail = async (productId) => {
     `SELECT
        p.id, p.title, p.description, p.money_price, p.point_price, p.type, p.created_at,
        u.name AS user_name, u.temperature,
-       loc.country, loc.region, loc.city,
-       c.name AS category_name
+       loc.city,
+       c.name AS category_name,
+       (SELECT COUNT(*) FROM favorites f WHERE f.product_id = p.id) AS favoriteCount,
+       (SELECT COUNT(*) FROM rooms r WHERE r.product_id = p.id) AS chatCount
      FROM products p
      JOIN users u ON u.id = p.user_id
      LEFT JOIN location loc ON loc.id = u.location_id
@@ -199,10 +201,12 @@ exports.getProductDetail = async (productId) => {
     userName: product.user_name,
     temperature: product.temperature,
     temperatureLevel: getTemperatureLevel(product.temperature),
-    location: `${product.region} ${product.city}`,
+    location: product.city,
     createdDaysAgo: `${diffDays}일`,
     category: product.category_name,
     images: images.map((row) => row.img),
+    favoriteCount: product.favoriteCount,
+    chatCount: product.chatCount,
   };
 };
 

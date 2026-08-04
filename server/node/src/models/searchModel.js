@@ -61,3 +61,49 @@ exports.getPopularSearchesThisMonth = async () => {
   );
   return rows.map((row) => row.title);
 };
+
+exports.searchProducts = async (keyword) => {
+  const baseSelect = `
+    SELECT
+      p.id, p.title, p.money_price, p.point_price, p.type, p.created_at,
+      (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img,
+      (SELECT COUNT(*) FROM favorites f WHERE f.product_id = p.id) AS favoriteCount,
+      (SELECT COUNT(*) FROM rooms r WHERE r.product_id = p.id) AS chatCount
+    FROM products p
+    WHERE p.title LIKE ? AND p.status = 'sale'
+  `;
+
+  const [generalPoint] = await pool.query(
+    `${baseSelect} AND p.type IN ('general', 'point') ORDER BY p.created_at DESC`,
+    [`%${keyword}%`],
+  );
+
+  const [auctionRows] = await pool.query(
+    `${baseSelect} AND p.type = 'auction' ORDER BY p.created_at DESC`,
+    [`%${keyword}%`],
+  );
+
+  const now = new Date();
+  const daysAgo = (createdAt) =>
+    `${Math.floor((now - new Date(createdAt)) / (1000 * 60 * 60 * 24))}일`;
+
+  const formatItem = (row) => ({
+    id: row.id,
+    title: row.title,
+    img: row.img,
+    price:
+      row.type === "general"
+        ? row.money_price
+        : row.type === "point"
+          ? row.point_price
+          : null,
+    createdDaysAgo: daysAgo(row.created_at),
+    favoriteCount: row.favoriteCount,
+    chatCount: row.chatCount,
+  });
+
+  return {
+    generalAndPoint: generalPoint.map(formatItem),
+    auction: auctionRows.map(formatItem),
+  };
+};

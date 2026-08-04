@@ -23,6 +23,7 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const roomRoutes = require("./routes/roomRoutes");
 const searchRoutes = require("./routes/searchRoutes");
+const postRoutes = require("./routes/postRoutes");
 
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
@@ -32,6 +33,7 @@ app.use("/category", categoryRoutes);
 app.use("/report", reportRoutes);
 app.use("/products", productRoutes);
 app.use("/rooms", roomRoutes);
+app.use("/posts", postRoutes);
 
 require("./sockets/chatSocket")(io);
 

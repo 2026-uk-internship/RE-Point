@@ -1,4 +1,3 @@
-// src/controllers/locationController.js
 const locationModel = require("../models/locationModel");
 
 exports.getLocations = async (req, res) => {
