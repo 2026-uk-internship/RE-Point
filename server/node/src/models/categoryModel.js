@@ -47,3 +47,18 @@ exports.setUserCategories = async (userId, categoryIds) => {
     connection.release();
   }
 };
+
+exports.getAllGroups = async () => {
+  const [rows] = await pool.query(
+    `SELECT id, name FROM category_group ORDER BY id`,
+  );
+  return rows;
+};
+
+exports.getCategoriesByGroup = async (groupId) => {
+  const [rows] = await pool.query(
+    `SELECT id, name, point_rate FROM category WHERE group_id = ? ORDER BY name`,
+    [groupId],
+  );
+  return rows;
+};

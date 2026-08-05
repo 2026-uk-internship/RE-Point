@@ -4,6 +4,7 @@ const bcrypt = require("bcrypt");
 const SALT_ROUNDS = 10;
 
 // 회원 가입 (signup)
+// src/models/authModel.js
 exports.createUser = async (username, email, password, phone) => {
   const connection = await pool.getConnection();
 
@@ -19,21 +20,14 @@ exports.createUser = async (username, email, password, phone) => {
 
     const authId = auth.insertId;
 
-    const [location] = await connection.query(
-      `INSERT INTO location (country, region, city) VALUES (?, ?, ?)`,
-      ["Not Set", "Not Set", "Not Set"],
-    );
-
-    const locationId = location.insertId;
-
+    // location_id는 NULL로 두고, 나중에 사용자가 직접 선택
     const [user] = await connection.query(
-      `INSERT INTO users (id, name, location_id) VALUES (?, ?, ?)`,
-      [authId, username, locationId],
+      `INSERT INTO users (id, name) VALUES (?, ?)`,
+      [authId, username],
     );
 
     await connection.commit();
-
-    return { authId, locationId, user };
+    return { authId, user };
   } catch (err) {
     await connection.rollback();
     throw err;
@@ -105,4 +99,10 @@ exports.isEmailVerified = async (email) => {
     [email],
   );
   return rows.length > 0;
+};
+
+exports.updateLastActive = async (userId) => {
+  await pool.query(`UPDATE users SET last_active_at = NOW() WHERE id = ?`, [
+    userId,
+  ]);
 };
