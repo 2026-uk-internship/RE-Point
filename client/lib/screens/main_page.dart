@@ -42,17 +42,19 @@ class _MainPageState extends State<MainPage> {
       extendBody: true,
       body: Stack(
         children: [
-          IndexedStack(
-            index: _currentIndex,
-            children: _pages,
-          ),
+          IndexedStack(index: _currentIndex, children: _pages),
           Align(
             alignment: Alignment.bottomCenter,
-            child: CustomBottomNav(
-              currentIndex: _currentIndex,
-              onTap: (index) {
-                setState(() => _currentIndex = index);
-              },
+            child: SafeArea(
+              // 하단 시스템 제스처 바(예: S23 제스처 내비게이션)에
+              // 메뉴바가 가려지거나 잘리지 않도록 안전 영역만큼 여백을 둠.
+              minimum: const EdgeInsets.only(bottom: 8),
+              child: CustomBottomNav(
+                currentIndex: _currentIndex,
+                onTap: (index) {
+                  setState(() => _currentIndex = index);
+                },
+              ),
             ),
           ),
         ],

@@ -3,6 +3,7 @@ import '../theme/chat_theme.dart';
 import 'alarm_page.dart';
 import 'list_for_auction_page.dart';
 import 'post_auction_page.dart';
+import 'item_detail_page.dart';
 
 /// 홈 탭 화면 (디자인 시안의 "mainpage").
 ///
@@ -23,12 +24,14 @@ class HomePage extends StatefulWidget {
 // ---------------------------------------------------------------------------
 
 class _AuctionItem {
+  final int id;
   final String title;
   final String price;
   final String timeAgo; // 예: "00:29 left"
   final String? imageUrl;
 
   const _AuctionItem({
+    required this.id,
     required this.title,
     required this.price,
     required this.timeAgo,
@@ -37,12 +40,14 @@ class _AuctionItem {
 }
 
 class _SecondhandItem {
+  final int id;
   final String title;
   final String price;
   final String location;
   final String? imageUrl;
 
   const _SecondhandItem({
+    required this.id,
     required this.title,
     required this.price,
     required this.location,
@@ -75,16 +80,16 @@ class _HomePageState extends State<HomePage> {
 
   // TODO: HomeService.fetchTrendingAuctions() 등으로 교체
   final List<_AuctionItem> trendingAuctions = const [
-    _AuctionItem(title: 'Animal book', price: 'P 10', timeAgo: '00:29 left'),
-    _AuctionItem(title: 'CRAFFAS', price: 'P 25', timeAgo: '01:23 left'),
-    _AuctionItem(title: 'fine paint', price: 'P 100', timeAgo: '02:40 left'),
-    _AuctionItem(title: 'shirts', price: 'P 50', timeAgo: '04:32 left'),
+    _AuctionItem(id: 1, title: 'Animal book', price: 'P 10', timeAgo: '00:29 left'),
+    _AuctionItem(id: 2, title: 'CRAFFAS', price: 'P 25', timeAgo: '01:23 left'),
+    _AuctionItem(id: 3, title: 'fine paint', price: 'P 100', timeAgo: '02:40 left'),
+    _AuctionItem(id: 4, title: 'shirts', price: 'P 50', timeAgo: '04:32 left'),
   ];
 
   final List<_SecondhandItem> nearbySecondhand = const [
-    _SecondhandItem(title: 'Art marker', price: '£10', location: 'London Camden'),
-    _SecondhandItem(title: 'uniform shirt', price: '£3', location: 'London Camden'),
-    _SecondhandItem(title: 'Bike', price: '£0', location: 'London Camden'),
+    _SecondhandItem(id: 10, title: 'Art marker', price: '£10', location: 'London Camden'),
+    _SecondhandItem(id: 11, title: 'uniform shirt', price: '£3', location: 'London Camden'),
+    _SecondhandItem(id: 12, title: 'Bike', price: '£0', location: 'London Camden'),
   ];
 
   final List<_CommunityPost> communityPosts = const [
@@ -116,8 +121,26 @@ class _HomePageState extends State<HomePage> {
     if (_isWriteMenuOpen) setState(() => _isWriteMenuOpen = false);
   }
 
+  // 게시물(경매/중고) 카드를 탭하면 상세 페이지로 이동
+  void _navigateToDetail(int productId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ItemDetailPage(productId: productId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // CustomBottomNav의 실제 배치 방식(bottomInset + 12 여백 + 64 높이)과
+    // 맞춰서, 기기의 하단 안전영역(S23 제스처 내비게이션 등)이 커도
+    // Writing 버튼이 메뉴바 위쪽에 오도록 동적으로 계산.
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final navBarClearance = bottomInset + 12 + 64; // 메뉴바가 차지하는 하단 높이
+    final writeButtonBottom = navBarClearance + 16; // 메뉴바 위 여백
+    final writeMenuBottom = writeButtonBottom + 60; // Writing 버튼 위 여백
+
     return Container(
       decoration: ChatColors.screenBackground(),
       // Stack으로 감싸서 Writing 버튼(및 그 메뉴)이 스크롤되는 리스트와 별개로
@@ -148,11 +171,11 @@ class _HomePageState extends State<HomePage> {
           // 스크롤 위치와 무관하게 항상 같은 화면 위치에 떠 있는 Writing 버튼
           Positioned(
             right: 20,
-            bottom: 110,
+            bottom: writeButtonBottom,
             child: _buildWriteButton(),
           ),
           // Writing 버튼을 눌렀을 때: 배경이 어두워지고 그 위에 선택 메뉴가 뜸
-          if (_isWriteMenuOpen) _buildWriteMenuOverlay(),
+          if (_isWriteMenuOpen) _buildWriteMenuOverlay(writeMenuBottom),
         ],
       ),
     );
@@ -262,52 +285,55 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _auctionCard(_AuctionItem item) {
-    return SizedBox(
-      width: 110,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              _thumbnail(item.imageUrl, size: 110),
-              const Positioned(
-                right: 6,
-                top: 6,
-                child: Icon(Icons.favorite_border, color: Colors.white, size: 16),
-              ),
-              Positioned(
-                left: 6,
-                bottom: 6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    item.timeAgo,
-                    style: const TextStyle(color: Colors.white, fontSize: 9),
+    return GestureDetector(
+      onTap: () => _navigateToDetail(item.id),
+      child: SizedBox(
+        width: 110,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                _thumbnail(item.imageUrl, size: 110),
+                const Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Icon(Icons.favorite_border, color: Colors.white, size: 16),
+                ),
+                Positioned(
+                  left: 6,
+                  bottom: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      item.timeAgo,
+                      style: const TextStyle(color: Colors.white, fontSize: 9),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            item.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          Text(
-            item.price,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            Text(
+              item.price,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -326,41 +352,44 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _secondhandCard(_SecondhandItem item) {
-    return SizedBox(
-      width: 130,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _thumbnail(item.imageUrl, size: 130),
-          const SizedBox(height: 6),
-          Text(
-            item.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          Row(
-            children: [
-              Text(
-                item.price,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+    return GestureDetector(
+      onTap: () => _navigateToDetail(item.id),
+      child: SizedBox(
+        width: 130,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _thumbnail(item.imageUrl, size: 130),
+            const SizedBox(height: 6),
+            Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            Row(
+              children: [
+                Text(
+                  item.price,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              Flexible(
-                child: Text(
-                  item.location,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: ChatColors.textSecondary, fontSize: 10),
+                const Spacer(),
+                Flexible(
+                  child: Text(
+                    item.location,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: ChatColors.textSecondary, fontSize: 10),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -442,7 +471,7 @@ class _HomePageState extends State<HomePage> {
   // 탭하면 각각 Sell Item / Start Auction 화면(현재는 placeholder)으로 이동합니다.
   // 실제 디자인이 나오면 list_for_auction_page.dart / post_auction_page.dart
   // 내용만 교체하면 됩니다.
-  Widget _buildWriteMenuOverlay() {
+  Widget _buildWriteMenuOverlay(double menuBottom) {
     return Positioned.fill(
       child: Stack(
         children: [
@@ -452,10 +481,10 @@ class _HomePageState extends State<HomePage> {
             behavior: HitTestBehavior.opaque,
             child: Container(color: Colors.black.withOpacity(0.45)),
           ),
-          // Writing 버튼(bottom: 110) 바로 위에 뜨는 선택 메뉴
+          // Writing 버튼 바로 위에 뜨는 선택 메뉴
           Positioned(
             right: 20,
-            bottom: 170,
+            bottom: menuBottom,
             // 카드 자체를 탭했을 때는 바깥 딤 레이어로 이벤트가 전달되어 닫히지 않도록 함
             child: GestureDetector(
               onTap: () {},
@@ -472,7 +501,7 @@ class _HomePageState extends State<HomePage> {
       width: 220,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFE7D2EF), // 연보라 파스텔 배경
+        color: const Color(0xA5A7CBF2), // 요청한 색상 (연한 블루톤, 반투명)
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(

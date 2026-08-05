@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/chat_theme.dart';
+import 'search_results_page.dart';
 
 /// 검색 탭 화면 (Search Page).
 class SearchPage extends StatefulWidget {
@@ -35,6 +36,21 @@ class _SearchPageState extends State<SearchPage> {
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _runSearch(String query) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    setState(() {
+      _recentSearches.remove(trimmed);
+      _recentSearches.insert(0, trimmed);
+    });
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SearchResultsPage(initialQuery: trimmed),
+      ),
+    );
   }
 
   @override
@@ -96,13 +112,7 @@ class _SearchPageState extends State<SearchPage> {
                 border: InputBorder.none,
                 isDense: true,
               ),
-              onSubmitted: (value) {
-                if (value.trim().isNotEmpty) {
-                  setState(() {
-                    _recentSearches.insert(0, value.trim());
-                  });
-                }
-              },
+              onSubmitted: (value) => _runSearch(value),
             ),
           ),
           if (_searchController.text.isNotEmpty)
@@ -182,7 +192,9 @@ class _SearchPageState extends State<SearchPage> {
       runSpacing: 8,
       children: _recentSearches
           .map(
-            (search) => Container(
+            (search) => GestureDetector(
+              onTap: () => _runSearch(search),
+              child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.08),
@@ -211,6 +223,7 @@ class _SearchPageState extends State<SearchPage> {
                   ),
                 ],
               ),
+              ),
             ),
           )
           .toList(),
@@ -226,9 +239,7 @@ class _SearchPageState extends State<SearchPage> {
           .map(
             (tag) => InkWell(
               borderRadius: BorderRadius.circular(20),
-              onTap: () {
-                _searchController.text = tag;
-              },
+              onTap: () => _runSearch(tag),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
