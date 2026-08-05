@@ -67,7 +67,7 @@
 
 ### 카테고리 그룹 목록 조회 (신규)
 
-`GET /category/groups`
+`GET /products/groups`
 
 ```json
 {

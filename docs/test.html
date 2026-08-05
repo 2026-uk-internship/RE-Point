@@ -183,9 +183,12 @@
         <!-- 카테고리 -->
         <div class="card">
             <h2>3. 카테고리</h2>
-            <button onclick="getCategories()">전체 목록 조회</button>
+            <button onclick="getCategories()">모든 카테고리</button>
             <div class="row" style="margin-top: 8px;">
-                <button class="secondary" onclick="getCategoryGroups()">그룹 목록 조회</button>
+                <button class="secondary" onclick="getCategoryGroups(1)">Shopping</button>
+                <button class="secondary" onclick="getCategoryGroups(2)">Cloth</button>
+                <button class="secondary" onclick="getCategoryGroups(3)">School</button>
+                <button class="secondary" onclick="getCategoryGroups(4)">Devices</button>
             </div>
             <pre id="out-category"></pre>
         </div>
@@ -451,8 +454,8 @@
         async function getCategories() {
             show('out-category', await api('GET', '/category'));
         }
-        async function getCategoryGroups() {
-            show('out-category', await api('GET', '/category/groups'));
+        async function getCategoryGroups(groupId) {
+            show('out-category', await api('GET', `/products/groups/${groupId}`));
         }
 
         // 4. 지역
