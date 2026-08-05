@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../theme/chat_theme.dart';
+import '../widgets/auction_end_date_picker.dart';
 
 /// "Start Auction" 메뉴를 눌렀을 때 뜨는 "Create Auction" (경매 등록) 화면.
-///
-/// TODO(백엔드 연동):
-/// - 사진 선택: image_picker 패키지 붙여서 _selectedImageCount 대신 실제 파일 리스트 관리
-/// - Save Draft / Post Listing: 실제 등록 API 연결
 class ListForAuctionPage extends StatefulWidget {
   const ListForAuctionPage({super.key});
 
@@ -55,18 +54,8 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
     'Flexible',
   ];
   static const List<String> _monthNames = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
   final _titleController = TextEditingController();
@@ -74,7 +63,8 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
   final _startingBidController = TextEditingController(text: '10');
   final _buyNowController = TextEditingController(text: '500');
 
-  int _selectedImageCount = 0; // TODO: 실제 선택한 이미지 개수로 교체
+  final List<XFile> _selectedImages = [];
+  final ImagePicker _imagePicker = ImagePicker();
   String? _selectedCategory;
   String _location = 'Camden Town';
   String _meetingPreference = 'Public Place';
@@ -92,81 +82,76 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: ChatColors.screenBackground(),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildTopBar(context, 'Create Auction'),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _photoPicker(),
-                      const SizedBox(height: 24),
-                      _label('title'),
-                      const SizedBox(height: 8),
-                      _pillTextField(
-                        controller: _titleController,
-                        hint: 'Please enter a title',
+      backgroundColor: const Color(0xFF0A0B24),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTopBar(context, 'Create Auction'),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _photoPicker(),
+                    const SizedBox(height: 24),
+                    _label('title'),
+                    const SizedBox(height: 8),
+                    _pillTextField(
+                      controller: _titleController,
+                      hint: 'Please enter a title',
+                    ),
+                    const SizedBox(height: 20),
+                    _label('Category'),
+                    const SizedBox(height: 8),
+                    _categorySelector(),
+                    const SizedBox(height: 20),
+                    _label('content'),
+                    const SizedBox(height: 8),
+                    _pillTextField(
+                      controller: _contentController,
+                      hint: 'Describe your item...\nAvoid profanity or offensive language.',
+                      maxLines: 4,
+                      borderRadius: 20,
+                    ),
+                    const SizedBox(height: 24),
+                    _label('Starting Bid'),
+                    const SizedBox(height: 8),
+                    _startingBidBox(),
+                    const SizedBox(height: 24),
+                    _label('Auction Ends'),
+                    const SizedBox(height: 8),
+                    _auctionEndsBox(),
+                    const SizedBox(height: 28),
+                    _label('Trade Settings'),
+                    const SizedBox(height: 8),
+                    _settingRow(
+                      label: 'Location',
+                      value: _location,
+                      onTap: () => _openOptionPicker(
+                        title: 'Location',
+                        options: _locationOptions,
+                        current: _location,
+                        onSelected: (value) => setState(() => _location = value),
                       ),
-                      const SizedBox(height: 20),
-                      _label('Category'),
-                      const SizedBox(height: 8),
-                      _categorySelector(),
-                      const SizedBox(height: 20),
-                      _label('content'),
-                      const SizedBox(height: 8),
-                      _pillTextField(
-                        controller: _contentController,
-                        hint:
-                            'Describe your item...\nAvoid profanity or offensive language.',
-                        maxLines: 4,
-                        borderRadius: 20,
+                    ),
+                    _settingRow(
+                      label: 'Meeting Preference',
+                      value: _meetingPreference,
+                      onTap: () => _openOptionPicker(
+                        title: 'Meeting Preference',
+                        options: _meetingOptions,
+                        current: _meetingPreference,
+                        onSelected: (value) => setState(() => _meetingPreference = value),
                       ),
-                      const SizedBox(height: 24),
-                      _label('Starting Bid'),
-                      const SizedBox(height: 8),
-                      _startingBidBox(),
-                      const SizedBox(height: 24),
-                      _label('Auction Ends'),
-                      const SizedBox(height: 8),
-                      _auctionEndsBox(),
-                      const SizedBox(height: 28),
-                      _label('Trade Settings'),
-                      const SizedBox(height: 8),
-                      _settingRow(
-                        label: 'Location',
-                        value: _location,
-                        onTap: () => _openOptionPicker(
-                          title: 'Location',
-                          options: _locationOptions,
-                          current: _location,
-                          onSelected: (value) =>
-                              setState(() => _location = value),
-                        ),
-                      ),
-                      _settingRow(
-                        label: 'Meeting Preference',
-                        value: _meetingPreference,
-                        onTap: () => _openOptionPicker(
-                          title: 'Meeting Preference',
-                          options: _meetingOptions,
-                          current: _meetingPreference,
-                          onSelected: (value) =>
-                              setState(() => _meetingPreference = value),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ),
               ),
-              _buildBottomButtons(),
-            ],
-          ),
+            ),
+            _buildBottomButtons(),
+          ],
         ),
       ),
     );
@@ -214,38 +199,100 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
   }
 
   // ----- 사진 선택 -----
+  static const double _photoTileSize = 64;
+  static const double _photoTileRadius = 16;
+  static final BorderRadius _photoTileBorderRadius = BorderRadius.circular(_photoTileRadius);
+  static final Color _photoTileBorderColor = Colors.white.withOpacity(0.24);
+  static final Color _photoTileBackground = Colors.white.withOpacity(0.08);
+
   Widget _photoPicker() {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        ..._selectedImages.asMap().entries.map(
+              (entry) => _photoThumbnail(entry.key, entry.value),
+            ),
+        if (_selectedImages.length < _maxPhotos) _addPhotoTile(),
+      ],
+    );
+  }
+
+  Widget _addPhotoTile() {
     return GestureDetector(
-      onTap: () {
-        // TODO: image_picker로 갤러리/카메라 연동, 선택 개수를 _selectedImageCount에 반영
-        setState(() {
-          if (_selectedImageCount < _maxPhotos) _selectedImageCount++;
-        });
-      },
+      onTap: _pickImages,
       child: Container(
-        width: 64,
-        height: 64,
+        width: _photoTileSize,
+        height: _photoTileSize,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(16),
+          color: _photoTileBackground,
+          borderRadius: _photoTileBorderRadius,
+          border: Border.all(color: _photoTileBorderColor),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.camera_alt_outlined,
-              color: Colors.white70,
-              size: 22,
-            ),
+            const Icon(Icons.camera_alt_outlined, color: Colors.white70, size: 22),
             const SizedBox(height: 4),
             Text(
-              '$_selectedImageCount/$_maxPhotos',
+              '${_selectedImages.length}/$_maxPhotos',
               style: const TextStyle(color: Colors.white70, fontSize: 10),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _photoThumbnail(int index, XFile file) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: _photoTileSize,
+          height: _photoTileSize,
+          decoration: BoxDecoration(
+            color: _photoTileBackground,
+            borderRadius: _photoTileBorderRadius,
+            border: Border.all(color: _photoTileBorderColor),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.file(File(file.path), fit: BoxFit.cover),
+        ),
+        Positioned(
+          top: -6,
+          right: -6,
+          child: GestureDetector(
+            onTap: () => _removeImage(index),
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                color: Color(0xFF241A3D),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close_rounded, color: Colors.white, size: 13),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickImages() async {
+    final remainingSlots = _maxPhotos - _selectedImages.length;
+    if (remainingSlots <= 0) return;
+
+    final picked = await _imagePicker.pickMultiImage();
+    if (picked.isEmpty) return;
+
+    setState(() {
+      _selectedImages.addAll(picked.take(remainingSlots));
+    });
+  }
+
+  void _removeImage(int index) {
+    setState(() => _selectedImages.removeAt(index));
   }
 
   // ----- 공용 입력 필드 -----
@@ -283,7 +330,7 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
     );
   }
 
-  // ----- 카테고리 선택 -----
+  // ----- 카테고리 선택 버튼 -----
   Widget _categorySelector() {
     return GestureDetector(
       onTap: _openCategoryPicker,
@@ -292,14 +339,14 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white24),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
         ),
         child: Text(
           _selectedCategory ?? 'Select a category',
           style: TextStyle(
             color: _selectedCategory != null
                 ? Colors.white
-                : ChatColors.textSecondary,
+                : Colors.white.withOpacity(0.38),
             fontSize: 13,
           ),
         ),
@@ -307,38 +354,72 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
     );
   }
 
+  // ----- 이미지 스타일 맞춤 카테고리 드롭다운 -----
   void _openCategoryPicker() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) {
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 30, vertical: 60),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          margin: const EdgeInsets.only(left: 20, right: 140, bottom: 40, top: 100),
           decoration: BoxDecoration(
-            color: const Color(0xFFF6D9E4),
-            borderRadius: BorderRadius.circular(24),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
+          clipBehavior: Clip.antiAlias,
           child: ListView.builder(
             shrinkWrap: true,
+            padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: _categories.length,
             itemBuilder: (context, index) {
               final category = _categories[index];
               final isSelected = category == _selectedCategory;
-              return ListTile(
-                title: Text(
-                  category,
-                  style: TextStyle(
-                    color: const Color(0xFF4D2A3A),
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
-                ),
+
+              return InkWell(
                 onTap: () {
                   setState(() => _selectedCategory = category);
                   Navigator.pop(context);
                 },
+                child: Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    children: [
+                      // 글자 앞 짝대기 (세로 구분선)
+                      Container(
+                        width: 2,
+                        height: 14,
+                        color: isSelected
+                            ? const Color(0xFF241A3D)
+                            : Colors.grey.withOpacity(0.35),
+                      ),
+                      const SizedBox(width: 10),
+                      // 연한 글자색 카테고리 텍스트
+                      Expanded(
+                        child: Text(
+                          category,
+                          style: TextStyle(
+                            color: isSelected
+                                ? const Color(0xFF241A3D)
+                                : const Color(0xFF8E8E93),
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               );
             },
           ),
@@ -452,7 +533,7 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
                     elevation: 0,
                   ),
                   onPressed: () {
-                    setState(() {}); // Starting Bid 박스에 새 값 반영
+                    setState(() {});
                     Navigator.pop(sheetContext);
                   },
                   child: const Text(
@@ -501,29 +582,15 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
   }
 
   Future<void> _pickAuctionEndDateTime() async {
-    final pickedDate = await showDatePicker(
-      context: context,
-      initialDate: _auctionEndsAt,
+    final picked = await showAuctionEndDatePicker(
+      context,
+      initialDateTime: _auctionEndsAt,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 90)),
     );
-    if (pickedDate == null || !mounted) return;
+    if (picked == null || !mounted) return;
 
-    final pickedTime = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_auctionEndsAt),
-    );
-    if (pickedTime == null) return;
-
-    setState(() {
-      _auctionEndsAt = DateTime(
-        pickedDate.year,
-        pickedDate.month,
-        pickedDate.day,
-        pickedTime.hour,
-        pickedTime.minute,
-      );
-    });
+    setState(() => _auctionEndsAt = picked);
   }
 
   String _formatDateTime(DateTime dt) {

@@ -208,88 +208,36 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-Widget _buildAvatar(ChatRoomModel room) {
-    // 💡 참고: room.itemImageUrl (상품/게시물 이미지 URL) 속성이 ChatRoomModel에 있어야 합니다.
-    // 만약 모델에 해당 값이 없다면 임시로 room.opponentAvatarUrl 등을 넣거나 모델을 확장해주세요!
-    final String? itemImageUrl = room.itemImageUrl; // 예시 (필요시 모델 속성명에 맞게 변경)
-    final String? profileImageUrl = room.opponentAvatarUrl;
-
-    return SizedBox(
-      width: 60,
-      height: 60,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // 1. 뒤쪽에 배치되는 게시물/상품 메인 사진 (둥근 사각형)
-          Positioned(
-            top: 0,
-            left: 0,
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16), // 첨부 이미지와 같은 둥근 모서리
-                color: Colors.white.withOpacity(0.1),
-                image: itemImageUrl != null
-                    ? DecorationImage(
-                        image: NetworkImage(itemImageUrl),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-              ),
-              child: itemImageUrl == null
-                  ? const Icon(Icons.image, color: Colors.white38, size: 24)
-                  : null,
-            ),
-          ),
-
-          // 2. 우측 하단에 겹쳐서 올라가는 상대방 프로필 사진 (작은 동그라미)
+  Widget _buildAvatar(ChatRoomModel room) {
+    return Stack(
+      children: [
+        CircleAvatar(
+          radius: 24,
+          backgroundColor: Colors.white.withOpacity(0.1),
+          backgroundImage:
+              room.opponentAvatarUrl != null ? NetworkImage(room.opponentAvatarUrl!) : null,
+          child: room.opponentAvatarUrl == null
+              ? Text(
+                  room.opponentName.isNotEmpty ? room.opponentName[0] : '?',
+                  style: const TextStyle(color: Colors.white),
+                )
+              : null,
+        ),
+        if (room.isOpponentOnline)
           Positioned(
             right: 0,
             bottom: 0,
             child: Container(
+              width: 12,
+              height: 12,
               decoration: BoxDecoration(
+                color: ChatColors.onlineDot,
                 shape: BoxShape.circle,
-                // 메인 사진 및 배경과 구분되는 테두리 효과
-                border: Border.all(color: const Color(0xFF14091F), width: 2), 
-              ),
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 15, // 프로필 사진 크기
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    backgroundImage: profileImageUrl != null
-                        ? NetworkImage(profileImageUrl)
-                        : null,
-                    child: profileImageUrl == null
-                        ? Text(
-                            room.opponentName.isNotEmpty ? room.opponentName[0] : '?',
-                            style: const TextStyle(color: Colors.white, fontSize: 11),
-                          )
-                        : null,
-                  ),
-
-                  // 3. 온라인 표시 (초록색 점 / 빨간 세모 등)
-                  if (room.isOpponentOnline)
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: 9,
-                        height: 9,
-                        decoration: BoxDecoration(
-                          color: ChatColors.onlineDot,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black, width: 1.5),
-                        ),
-                      ),
-                    ),
-                ],
+                border: Border.all(color: ChatColors.topBarBackground, width: 2),
               ),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 }

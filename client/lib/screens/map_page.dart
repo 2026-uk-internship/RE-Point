@@ -4,19 +4,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 /// 지도 탭 화면.
 ///
-/// 우측 하단의 현위치 버튼을 누르면 GPS로 현재 위치를 가져와
-/// 그 위치로 카메라를 이동시킵니다.
-///
-/// 사용 전 준비물:
-/// 1) pubspec.yaml에 geolocator 패키지 추가
-///    dependencies:
-///      geolocator: ^12.0.0
-/// 2) Android: android/app/src/main/AndroidManifest.xml <manifest> 안에 추가
-///    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-///    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-/// 3) iOS: ios/Runner/Info.plist에 추가
-///    <key>NSLocationWhenInUseUsageDescription</key>
-///    <string>주변 경매/중고 물품을 보여주기 위해 위치 권한이 필요합니다.</string>
+/// 1) 지도를 터치하면 해당 위치에 핀(마커)이 찍히고 위도·경도가 추출됩니다.
+/// 2) 우측 하단의 현위치 버튼을 누르면 GPS로 현재 위치를 가져와 그 위치로 이동합니다.
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
 
@@ -27,6 +16,9 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   GoogleMapController? _mapController;
   bool _isLocating = false;
+
+  // 선택한 위치의 위도·경도를 저장하는 변수
+  LatLng? _selectedLocation;
 
   static const CameraPosition _initialPosition = CameraPosition(
     target: LatLng(51.5074, -0.1278), // London, UK
@@ -45,13 +37,42 @@ class _MapPageState extends State<MapPage> {
       children: [
         GoogleMap(
           initialCameraPosition: _initialPosition,
-          // 너무 축소하면 에뮬레이터에서 타일 렌더링이 깨지는 경우가 있어
-          // 최소 줌 레벨을 제한해서 문제 구간 자체를 피합니다.
           minMaxZoomPreference: const MinMaxZoomPreference(5, 20),
           myLocationEnabled: true, // 지도 위에 파란 점으로 내 위치 표시
           myLocationButtonEnabled: false, // 기본 제공 버튼 대신 아래 커스텀 버튼 사용
           onMapCreated: (controller) => _mapController = controller,
+
+          // 1. 지도를 터치(클릭)했을 때 동작
+          onTap: (LatLng location) {
+            setState(() {
+              _selectedLocation = location;
+            });
+
+            // 콘솔창에서 추출된 위도, 경도 확인 가능!
+            print("선택된 위도(latitude): ${location.latitude}");
+            print("선택된 경도(longitude): ${location.longitude}");
+
+            // TODO: 상품 등록 화면이나 백엔드 API 요청 시
+            // location.latitude 와 location.longitude 값을 사용하시면 됩니다.
+          },
+
+          // 2. 터치한 위치에 마커(핀) 띄우기
+          markers: _selectedLocation == null
+              ? {}
+              : {
+                  Marker(
+                    markerId: const MarkerId('selected_location'),
+                    position: _selectedLocation!,
+                    infoWindow: InfoWindow(
+                      title: '선택한 위치',
+                      snippet:
+                          '${_selectedLocation!.latitude.toStringAsFixed(4)}, ${_selectedLocation!.longitude.toStringAsFixed(4)}',
+                    ),
+                  ),
+                },
         ),
+
+        // 우측 하단 현위치 버튼
         Positioned(
           right: 16,
           bottom: 110, // 하단 네비게이션 바와 안 겹치도록 여유를 둠
@@ -119,8 +140,6 @@ class _MapPageState extends State<MapPage> {
   }
 
   /// 위치 서비스 활성화 여부와 권한을 확인한 뒤 현재 위치를 반환합니다.
-  /// TODO: 실제 앱에서는 권한이 영구 거부됐을 때 설정 화면으로 안내하는
-  /// 다이얼로그(Geolocator.openAppSettings() 등)를 추가하면 사용성이 좋아집니다.
   Future<Position> _determinePosition() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {

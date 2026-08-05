@@ -31,8 +31,6 @@ class SchedulePage extends StatefulWidget {
 }
 
 class _SchedulePageState extends State<SchedulePage> {
-  static const List<String> _weekdayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
   late DateTime _visibleMonth; // 항상 day=1로 유지
   DateTime? _selectedDate;
 
@@ -84,24 +82,20 @@ class _SchedulePageState extends State<SchedulePage> {
     final gridDays = _buildGridDays();
 
     return Scaffold(
-      body: Container(
-        decoration: ChatColors.screenBackground(),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildTopBar(),
-              const SizedBox(height: 8),
-              _buildMonthHeader(),
-              const SizedBox(height: 12),
-              _buildWeekdayRow(),
-              const SizedBox(height: 8),
-              Expanded(child: _buildDayGrid(gridDays)),
-              _buildPickupDateField(),
-              const SizedBox(height: 16),
-              _buildConfirmButton(),
-              const SizedBox(height: 12),
-            ],
-          ),
+      backgroundColor: const Color(0xFF0A0B24),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTopBar(),
+            const SizedBox(height: 8),
+            _buildMonthHeader(),
+            const SizedBox(height: 16),
+            Expanded(child: _buildDayGrid(gridDays)),
+            _buildPickupDateField(),
+            const SizedBox(height: 16),
+            _buildConfirmButton(),
+            const SizedBox(height: 12),
+          ],
         ),
       ),
     );
@@ -160,26 +154,6 @@ class _SchedulePageState extends State<SchedulePage> {
     );
   }
 
-  Widget _buildWeekdayRow() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: _weekdayLabels
-            .map(
-              (label) => Expanded(
-                child: Center(
-                  child: Text(
-                    label,
-                    style: const TextStyle(color: ChatColors.textSecondary, fontSize: 12),
-                  ),
-                ),
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-
   Widget _buildDayGrid(List<DateTime> gridDays) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -193,10 +167,17 @@ class _SchedulePageState extends State<SchedulePage> {
         itemBuilder: (context, index) {
           final day = gridDays[index];
           final isCurrentMonth = day.month == _visibleMonth.month;
+
+          if (!isCurrentMonth) {
+            // 다른 달의 날짜는 숫자 없이 빈 칸으로 남겨서
+            // 이번 달 날짜만 눈에 띄게 표시합니다.
+            return const SizedBox.shrink();
+          }
+
           final isSelected = _selectedDate != null && _isSameDay(day, _selectedDate!);
 
           return GestureDetector(
-            onTap: isCurrentMonth ? () => _selectDate(day) : null,
+            onTap: () => _selectDate(day),
             child: Center(
               child: Container(
                 width: 34,
@@ -213,11 +194,7 @@ class _SchedulePageState extends State<SchedulePage> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                    color: isSelected
-                        ? const Color(0xFF241A3D)
-                        : isCurrentMonth
-                            ? Colors.white
-                            : Colors.white24,
+                    color: isSelected ? const Color(0xFF241A3D) : Colors.white,
                   ),
                 ),
               ),
@@ -269,7 +246,7 @@ class _SchedulePageState extends State<SchedulePage> {
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: ChatColors.accentYellow,
-            foregroundColor: const Color(0xFF241A3D),
+            foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
             elevation: 0,
           ),
