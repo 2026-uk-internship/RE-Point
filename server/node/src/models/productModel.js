@@ -1,3 +1,4 @@
+// src/models/productModel.js
 const pool = require("../config/db");
 const { getTemperatureLevel } = require("../utils/temperature");
 
@@ -325,4 +326,343 @@ exports.getProductsByGroup = async (groupId) => {
     type: row.type,
     img: row.img,
   }));
+};
+
+exports.getMySellingGeneral = async (userId, status) => {
+  const [rows] = await pool.query(
+    `SELECT
+       p.id, p.title, p.type, p.money_price, p.point_price, p.status,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img,
+       (SELECT COUNT(*) FROM favorites f WHERE f.product_id = p.id) AS favoriteCount
+     FROM products p
+     WHERE p.user_id = ? AND p.type IN ('general', 'point') AND p.status = ?
+     ORDER BY p.created_at DESC`,
+    [userId, status],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    price: row.type === "general" ? row.money_price : row.point_price,
+    img: row.img,
+    favoriteCount: row.favoriteCount,
+  }));
+};
+
+exports.getMySellingAuction = async (userId, isOngoing) => {
+  const comparison = isOngoing ? "a.end_date > NOW()" : "a.end_date <= NOW()";
+
+  const [rows] = await pool.query(
+    `SELECT p.id, p.title, a.end_date, a.highest_point,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img,
+       (SELECT COUNT(*) FROM favorites f WHERE f.product_id = p.id) AS favoriteCount
+     FROM products p
+     JOIN auction a ON a.product_id = p.id
+     WHERE p.user_id = ? AND ${comparison}
+     ORDER BY a.end_date ASC`,
+    [userId],
+  );
+
+  const now = new Date();
+
+  return rows.map((row) => {
+    const diffMs = new Date(row.end_date) - now;
+    let remaining = "00:00";
+    if (diffMs > 0) {
+      const totalMinutes = Math.floor(diffMs / 60000);
+      const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+      const minutes = String(totalMinutes % 60).padStart(2, "0");
+      remaining = `${hours}:${minutes}`;
+    }
+
+    return {
+      id: row.id,
+      title: row.title,
+      img: row.img,
+      highestPoint: row.highest_point,
+      remaining,
+      favoriteCount: row.favoriteCount,
+    };
+  });
+};
+
+// 2-1. 최근 본 일반 상품(general+point)
+exports.getRecentViewedGeneral = async (userId) => {
+  const [rows] = await pool.query(
+    `SELECT
+       p.id, p.title, p.type, p.money_price, p.point_price,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img,
+       MAX(vp.date) AS viewedAt
+     FROM view_product vp
+     JOIN products p ON p.id = vp.product_id
+     WHERE vp.user_id = ? AND p.type IN ('general', 'point')
+     GROUP BY p.id
+     ORDER BY viewedAt DESC`,
+    [userId],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    price: row.type === "general" ? row.money_price : row.point_price,
+    img: row.img,
+  }));
+};
+
+// 2-2. 최근 본 경매
+exports.getRecentViewedAuction = async (userId) => {
+  const [rows] = await pool.query(
+    `SELECT
+       p.id, p.title, a.end_date, a.highest_point,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img,
+       MAX(vp.date) AS viewedAt
+     FROM view_product vp
+     JOIN products p ON p.id = vp.product_id
+     JOIN auction a ON a.product_id = p.id
+     WHERE vp.user_id = ?
+     GROUP BY p.id
+     ORDER BY viewedAt DESC`,
+    [userId],
+  );
+
+  const now = new Date();
+
+  return rows.map((row) => {
+    const diffMs = new Date(row.end_date) - now;
+    let remaining = "00:00";
+    if (diffMs > 0) {
+      const totalMinutes = Math.floor(diffMs / 60000);
+      const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+      const minutes = String(totalMinutes % 60).padStart(2, "0");
+      remaining = `${hours}:${minutes}`;
+    }
+    return {
+      id: row.id,
+      title: row.title,
+      img: row.img,
+      highestPoint: row.highest_point,
+      remaining,
+    };
+  });
+};
+
+// 조회 기록 저장 (상품 상세 조회 시 호출)
+exports.logProductView = async (userId, productId) => {
+  await pool.query(
+    `INSERT INTO view_product (user_id, product_id) VALUES (?, ?)`,
+    [userId, productId],
+  );
+};
+
+// 3-1. 좋아요한 일반 상품
+exports.getFavoritedGeneral = async (userId) => {
+  const [rows] = await pool.query(
+    `SELECT
+       p.id, p.title, p.type, p.money_price, p.point_price,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img
+     FROM favorites f
+     JOIN products p ON p.id = f.product_id
+     WHERE f.user_id = ? AND p.type IN ('general', 'point')
+     ORDER BY f.id DESC`,
+    [userId],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    price: row.type === "general" ? row.money_price : row.point_price,
+    img: row.img,
+  }));
+};
+
+// 3-2. 좋아요한 경매
+exports.getFavoritedAuction = async (userId) => {
+  const [rows] = await pool.query(
+    `SELECT
+       p.id, p.title, a.end_date, a.highest_point,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img
+     FROM favorites f
+     JOIN products p ON p.id = f.product_id
+     JOIN auction a ON a.product_id = p.id
+     WHERE f.user_id = ?
+     ORDER BY f.id DESC`,
+    [userId],
+  );
+
+  const now = new Date();
+
+  return rows.map((row) => {
+    const diffMs = new Date(row.end_date) - now;
+    let remaining = "00:00";
+    if (diffMs > 0) {
+      const totalMinutes = Math.floor(diffMs / 60000);
+      const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+      const minutes = String(totalMinutes % 60).padStart(2, "0");
+      remaining = `${hours}:${minutes}`;
+    }
+    return {
+      id: row.id,
+      title: row.title,
+      img: row.img,
+      highestPoint: row.highest_point,
+      remaining,
+    };
+  });
+};
+
+// src/models/productModel.js에 추가
+
+// 4-2-1. 내가 입찰한 경매 - 진행 중
+exports.getMyBiddingOngoing = async (userId) => {
+  const [rows] = await pool.query(
+    `SELECT DISTINCT
+       p.id, p.title, a.end_date, a.highest_point,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img
+     FROM bids b
+     JOIN auction a ON a.product_id = b.auction_id
+     JOIN products p ON p.id = a.product_id
+     WHERE b.user_id = ? AND a.end_date > NOW()
+     ORDER BY a.end_date ASC`,
+    [userId],
+  );
+
+  return rows.map((row) => formatAuctionRow(row));
+};
+
+// 4-2-2. 내가 입찰한 경매 - 낙찰 성공 (종료 + 내가 최고 입찰자)
+exports.getMyBiddingWon = async (userId) => {
+  const [rows] = await pool.query(
+    `SELECT DISTINCT
+       p.id, p.title, a.end_date, a.highest_point,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img
+     FROM bids b
+     JOIN auction a ON a.product_id = b.auction_id
+     JOIN products p ON p.id = a.product_id
+     WHERE b.user_id = ? AND a.end_date <= NOW() AND a.highest_user = ?
+     ORDER BY a.end_date DESC`,
+    [userId, userId],
+  );
+
+  return rows.map((row) => formatAuctionRow(row));
+};
+
+// 4-2-3. 내가 입찰한 경매 - 낙찰 실패 (종료 + 내가 최고 입찰자 아님)
+exports.getMyBiddingLost = async (userId) => {
+  const [rows] = await pool.query(
+    `SELECT DISTINCT
+       p.id, p.title, a.end_date, a.highest_point,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img
+     FROM bids b
+     JOIN auction a ON a.product_id = b.auction_id
+     JOIN products p ON p.id = a.product_id
+     WHERE b.user_id = ? AND a.end_date <= NOW()
+       AND (a.highest_user IS NULL OR a.highest_user != ?)
+     ORDER BY a.end_date DESC`,
+    [userId, userId],
+  );
+
+  return rows.map((row) => formatAuctionRow(row));
+};
+
+// 공통 포맷 함수 (remaining 계산 포함)
+function formatAuctionRow(row) {
+  const now = new Date();
+  const diffMs = new Date(row.end_date) - now;
+  let remaining = "00:00";
+  if (diffMs > 0) {
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+    const minutes = String(totalMinutes % 60).padStart(2, "0");
+    remaining = `${hours}:${minutes}`;
+  }
+  return {
+    id: row.id,
+    title: row.title,
+    img: row.img,
+    highestPoint: row.highest_point,
+    remaining,
+  };
+}
+
+exports.getAuctionDetail = async (productId) => {
+  const [[auction]] = await pool.query(
+    `SELECT
+       p.id, p.title, p.description, p.category_id,
+       a.end_date, a.start_point, a.highest_point, a.highest_user,
+       u.name AS sellerName, u.img AS sellerImg, u.temperature AS sellerTemperature,
+       loc.city AS sellerCity,
+       c.name AS categoryName,
+       (SELECT COUNT(*) FROM favorites f WHERE f.product_id = p.id) AS favoriteCount,
+       (SELECT COUNT(DISTINCT b.user_id) FROM bids b WHERE b.auction_id = p.id) AS participantCount
+     FROM products p
+     JOIN auction a ON a.product_id = p.id
+     JOIN users u ON u.id = p.user_id
+     LEFT JOIN location loc ON loc.id = u.location_id
+     LEFT JOIN category c ON c.id = p.category_id
+     WHERE p.id = ?`,
+    [productId],
+  );
+
+  if (!auction) return null;
+
+  const [images] = await pool.query(
+    `SELECT img FROM product_images WHERE product_id = ?`,
+    [productId],
+  );
+
+  // 최고 입찰자 프로필 이미지
+  let highestBidderImg = null;
+  if (auction.highest_user) {
+    const [[bidder]] = await pool.query(`SELECT img FROM users WHERE id = ?`, [
+      auction.highest_user,
+    ]);
+    highestBidderImg = bidder ? bidder.img : null;
+  }
+
+  // 관련 상품: 같은 카테고리의 다른 경매 상품
+  const [related] = await pool.query(
+    `SELECT p.id, p.title,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img
+     FROM products p
+     JOIN auction a2 ON a2.product_id = p.id
+     WHERE p.category_id = ? AND p.id != ? AND a2.end_date > NOW()
+     ORDER BY p.created_at DESC`,
+    [auction.category_id, productId],
+  );
+
+  // 남은 시간: "00h 00m left" 포맷
+  const diffMs = new Date(auction.end_date) - new Date();
+  let remaining = "00h 00m left";
+  if (diffMs > 0) {
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+    const minutes = String(totalMinutes % 60).padStart(2, "0");
+    remaining = `${hours}h ${minutes}m left`;
+  }
+
+  return {
+    id: auction.id,
+    title: auction.title,
+    description: auction.description,
+    category: auction.categoryName,
+    images: images.map((row) => row.img),
+    favoriteCount: auction.favoriteCount,
+    remaining,
+    seller: {
+      name: auction.sellerName,
+      img: auction.sellerImg,
+      city: auction.sellerCity,
+      temperatureLevel: getTemperatureLevel(auction.sellerTemperature),
+    },
+    highestBid: {
+      point: auction.highest_point,
+      bidderImg: highestBidderImg,
+    },
+    participantCount: auction.participantCount,
+    relatedProducts: related.map((row) => ({
+      id: row.id,
+      title: row.title,
+      img: row.img,
+    })),
+  };
 };

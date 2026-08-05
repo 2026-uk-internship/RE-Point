@@ -1,18 +1,17 @@
+// src/models/userModel.js
 const pool = require("../config/db");
 const { getTemperatureLevel } = require("../utils/temperature");
 
 exports.getProfile = async (userId) => {
   const [[user]] = await pool.query(
-    `SELECT name, img, temperature, point FROM users WHERE id = ?`,
+    `SELECT name, img, temperature, point, lock_point FROM users WHERE id = ?`,
     [userId],
   );
 
   if (!user) return null;
 
   const [[earned]] = await pool.query(
-    `SELECT COALESCE(SUM(amount), 0) AS total
-     FROM point_history
-     WHERE user_id = ? AND type = 'earn_sale'`,
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM point_history WHERE user_id = ? AND type = 'earn_sale'`,
     [userId],
   );
 
@@ -39,7 +38,9 @@ exports.getProfile = async (userId) => {
     img: user.img,
     temperature: user.temperature,
     temperatureLevel: getTemperatureLevel(user.temperature),
-    point: user.point,
+    totalPoint: user.point,
+    availablePoint: user.point - user.lock_point,
+    lockedPoint: user.lock_point,
     totalEarnedPoint: earned.total,
     boughtCount: counts.boughtCount || 0,
     soldCount: counts.soldCount || 0,

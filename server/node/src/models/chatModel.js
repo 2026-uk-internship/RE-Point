@@ -1,3 +1,4 @@
+// chatModel.js
 const pool = require("../config/db");
 const { formatTimeAMPM } = require("../utils/formatTime");
 

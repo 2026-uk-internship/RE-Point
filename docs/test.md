@@ -80,25 +80,6 @@
 }
 ```
 
-### 특정 그룹의 상품 목록 조회 (신규)
-
-`GET /category/groups/:id/products`
-
-```json
-{
-  "data": [
-    {
-      "id": 5,
-      "title": "아이폰 13 팝니다",
-      "money_price": 500000,
-      "point_price": null,
-      "type": "general",
-      "img": "url1"
-    }
-  ]
-}
-```
-
 ### 관심 카테고리 조회
 
 `GET /category/users/:id`
@@ -137,7 +118,26 @@
 일반/포인트 응답: `id, title, price, location, favoriteCount`
 경매 응답: `id, title, isOngoing, remaining(시:분), highestPoint, favoriteCount`
 
-> 경매 상세 페이지 API는 디자인 대기 중 (미구현)
+### 특정 그룹의 상품 목록 조회 (신규)
+
+`GET /products/groups/:id`
+
+```json
+{
+  "data": [
+    {
+      "id": 5,
+      "title": "아이폰 13 팝니다",
+      "money_price": 500000,
+      "point_price": null,
+      "type": "general",
+      "img": "url1"
+    }
+  ]
+}
+```
+
+> ⚠️ 이전 버전 문서엔 `/category/groups/:id/products`로 잘못 기재되어 있었음. 실제 서버 라우터 및 `api-tester.html` 기준으로 `/products/groups/:id`가 맞는 경로.
 
 ### 상세 조회
 
@@ -171,6 +171,97 @@
 
 `POST /products/:id/favorite`
 응답: `{ "data": { "favorited": true, "favoriteCount": 5 } }` — 최신 찜 개수까지 같이 와서 프론트에서 바로 반영 가능
+
+### 마이페이지 - 판매 목록
+
+| API                                 | 설명                                                                |
+| ----------------------------------- | ------------------------------------------------------------------- |
+| `GET /products/me/selling`          | 내가 판매 중인 일반 상품 (판매자=나, 타입=general/point, 상태=sale) |
+| `GET /products/me/sold`             | 내가 판매 완료한 일반 상품 (상태=sold)                              |
+| `GET /products/me/auctions/selling` | 내가 판매 중인 경매 (아직 종료 안 됨)                               |
+| `GET /products/me/auctions/sold`    | 내가 판매 완료한 경매 (종료 및 낙찰 완료)                           |
+
+(모두 인증 필요)
+
+### 마이페이지 - 최근 본 목록
+
+| API                                | 설명                         |
+| ---------------------------------- | ---------------------------- |
+| `GET /products/me/recent/general`  | 최근 조회한 일반/포인트 상품 |
+| `GET /products/me/recent/auctions` | 최근 조회한 경매             |
+
+(모두 인증 필요)
+
+### 마이페이지 - 경매 참여 목록
+
+내가 입찰한 경매를 진행 상태별로 분리해서 반환.
+
+| API                                | 설명                                    |
+| ---------------------------------- | --------------------------------------- |
+| `GET /products/me/bidding/ongoing` | 내가 입찰했고 아직 종료되지 않은 경매   |
+| `GET /products/me/bidding/won`     | 내가 최종 낙찰자인 경매                 |
+| `GET /products/me/bidding/lost`    | 내가 입찰했지만 다른 사람이 낙찰된 경매 |
+
+(모두 인증 필요)
+
+### 마이페이지 - 좋아요 목록
+
+| API                                   | 설명                       |
+| ------------------------------------- | -------------------------- |
+| `GET /products/me/favorites/general`  | 내가 찜한 일반/포인트 상품 |
+| `GET /products/me/favorites/auctions` | 내가 찜한 경매             |
+
+(모두 인증 필요)
+
+### 경매 상세 조회
+
+`GET /products/auctions/:id`
+
+경매 상세 페이지에 필요한 정보를 한 번에 반환.
+
+```json
+{
+  "id": 9,
+  "title": "...",
+  "description": "...",
+  "images": ["url1", "url2"],
+  "category": "...",
+  "favoriteCount": 3,
+  "remaining": "12h 35m left",
+  "seller": {
+    "name": "...",
+    "img": "...",
+    "city": "Camden",
+    "temperatureLevel": "warm"
+  },
+  "highestPoint": 1500,
+  "highestUserImg": "...",
+  "participantCount": 7,
+  "relatedAuctions": [
+    { "id": 12, "title": "...", "img": "url3", "highestPoint": 800 }
+  ]
+}
+```
+
+`remaining`은 `00h 00m left` 형식. `relatedAuctions`는 같은 카테고리의 다른 경매 상품.
+
+### 경매 참여자 목록
+
+`GET /products/auctions/:id/participants`
+
+```json
+{
+  "data": [
+    {
+      "userName": "Alice",
+      "userImg": "url1",
+      "point": 1200,
+      "biddedHoursAgo": "2 hours ago",
+      "isHighest": true
+    }
+  ]
+}
+```
 
 ---
 
@@ -360,6 +451,88 @@
 | `DELETE /posts/comments/:commentId` | 댓글 삭제 (작성자만)                |
 
 ---
+
+# 실시간 상품 시청자 기능 구현 문서
+
+상품 상세 페이지 진입 시 해당 상품을 실시간으로 보고 있는 **시청자 수(count)** 및 **시청자 프로필 정보(userId, userName, userImg)**를 Socket.IO를 통해 브로드캐스트하는 기능입니다.
+
+---
+
+## 1. 백엔드 구현 (Node.js & Socket.IO)
+
+### 1) `src/sockets/productSocket.js` (신규 생성)
+
+```javascript
+/**
+ * 실시간 상품 시청자 전용 소켓 이벤트 모듈
+ */
+module.exports = function setupProductSockets(io) {
+  // 방 단위 시청자 정보 집계 및 브로드캐스트
+  async function updateRoomViewers(roomName) {
+    try {
+      const sockets = await io.in(roomName).fetchSockets();
+
+      const viewers = sockets.map((s) => s.userData).filter(Boolean);
+
+      io.to(roomName).emit("product_viewers_updated", {
+        count: viewers.length,
+        viewers: viewers,
+      });
+    } catch (error) {
+      console.error(`[Socket Error] ${roomName} 시청자 집계 실패:`, error);
+    }
+  }
+
+  io.on("connection", (socket) => {
+    // 1. 상품 상세 페이지 진입
+    socket.on("join_product", async (data) => {
+      const { productId, userId, userName, userImg } = data || {};
+      if (!productId) return;
+
+      const roomName = `product_${productId}`;
+
+      if (!socket.rooms.has(roomName)) {
+        await socket.join(roomName);
+      }
+
+      socket.currentProductRoom = roomName;
+      socket.userData = {
+        userId: userId || `guest_${socket.id.substring(0, 5)}`,
+        userName: userName || "익명 사용자",
+        userImg: userImg || null,
+        joinedAt: new Date(),
+      };
+
+      await updateRoomViewers(roomName);
+    });
+
+    // 2. 상품 상세 페이지 이탈
+    socket.on("leave_product", async (data) => {
+      const { productId } = data || {};
+      const roomName = productId
+        ? `product_${productId}`
+        : socket.currentProductRoom;
+
+      if (roomName && socket.rooms.has(roomName)) {
+        await socket.leave(roomName);
+        delete socket.currentProductRoom;
+        delete socket.userData;
+
+        await updateRoomViewers(roomName);
+      }
+    });
+
+    // 3. 앱 종료/네트워크 연결 끊김 처리
+    socket.on("disconnecting", async () => {
+      for (const roomName of socket.rooms) {
+        if (roomName.startsWith("product_")) {
+          setImmediate(() => updateRoomViewers(roomName));
+        }
+      }
+    });
+  });
+};
+```
 
 ## 아직 준비 중
 
