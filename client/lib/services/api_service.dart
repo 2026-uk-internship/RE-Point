@@ -483,11 +483,17 @@ class ProductSocketService {
   }
 
   // 상품 상세 진입 이벤트 전송
-  void joinProduct({required int productId, int? userId, String? userName}) {
+  void joinProduct({
+    required int productId,
+    int? userId,
+    String? userName,
+    String? userImg, // 프로필 이미지 URL 추가
+  }) {
     socket.emit('join_product', {
       'productId': productId,
       'userId': userId,
       'userName': userName,
+      'userImg': userImg,
     });
   }
 

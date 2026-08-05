@@ -24,21 +24,20 @@ module.exports = function setupProductSockets(io) {
   io.on("connection", (socket) => {
     // 1. 상품 상세 페이지 진입
     socket.on("join_product", async (data) => {
-      const { productId, userId, userName } = data || {};
+      const { productId, userId, userName, userImg } = data || {}; // userImg 추가
       if (!productId) return;
 
       const roomName = `product_${productId}`;
 
-      // 이미 같은 방에 들어가 있다면 중복 입장 방지
       if (!socket.rooms.has(roomName)) {
         await socket.join(roomName);
       }
 
-      // 소켓 객체 메모리에 접속 유저 정보 저장
       socket.currentProductRoom = roomName;
       socket.userData = {
         userId: userId || `guest_${socket.id.substring(0, 5)}`,
         userName: userName || "익명 사용자",
+        userImg: userImg || null, // 프로필 이미지 URL 저장 (없으면 null)
         joinedAt: new Date(),
       };
 
