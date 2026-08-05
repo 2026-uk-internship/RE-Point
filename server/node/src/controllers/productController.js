@@ -15,8 +15,18 @@ exports.createProduct = async (req, res) => {
       location,
       latitude,
       longitude,
-      auction,
+      start_point,
+      end_date,
     } = req.body;
+
+    let auction = null;
+
+    if (type === "auction") {
+      auction = {
+        start_point,
+        end_date,
+      };
+    }
 
     if (!title || !type || !location || latitude == null || longitude == null) {
       return res.status(400).json({ message: "Required fields are missing." });
