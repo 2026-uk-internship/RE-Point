@@ -187,8 +187,6 @@
             <div class="row" style="margin-top: 8px;">
                 <button class="secondary" onclick="getCategoryGroups()">그룹 목록 조회</button>
             </div>
-            <label>그룹 ID (Group ID)</label><input id="cat-group-id" value="1" />
-            <button class="secondary" onclick="getProductsByGroup()">그룹별 상품 조회</button>
             <pre id="out-category"></pre>
         </div>
 
@@ -244,6 +242,12 @@
                 <option value="name">이름순</option>
             </select>
             <button onclick="getProductList()">목록 조회</button>
+            <div class="row" style="margin-top: 12px;">
+                <div>
+                    <label>그룹 ID (Group ID)</label><input id="cat-group-id" value="1" />
+                </div>
+            </div>
+            <button class="secondary" onclick="getProductsByGroup()">그룹별 상품 조회</button>
             <pre id="out-list"></pre>
         </div>
 
@@ -400,9 +404,6 @@
         async function getCategoryGroups() {
             show('out-category', await api('GET', '/category/groups'));
         }
-        async function getProductsByGroup() {
-            show('out-category', await api('GET', `/products/groups/${val('cat-group-id')}`));
-        }
 
         // 4. 지역
         async function getLocations() {
@@ -442,11 +443,14 @@
             show('out-register', await api('POST', '/products', form, true, true));
         }
 
-        // 6. 상품 목록
+        // 6. 상품 목록 (+ 그룹별 상품 조회)
         async function getProductList() {
             const type = val('list-type');
             const sort = val('list-sort');
             show('out-list', await api('GET', `/products/${type}?sort=${sort}`));
+        }
+        async function getProductsByGroup() {
+            show('out-list', await api('GET', `/products/groups/${val('cat-group-id')}`));
         }
 
         // 7. 상품 상세

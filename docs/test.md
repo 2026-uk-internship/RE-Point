@@ -80,25 +80,6 @@
 }
 ```
 
-### 특정 그룹의 상품 목록 조회 (신규)
-
-`GET /category/groups/:id/products`
-
-```json
-{
-  "data": [
-    {
-      "id": 5,
-      "title": "아이폰 13 팝니다",
-      "money_price": 500000,
-      "point_price": null,
-      "type": "general",
-      "img": "url1"
-    }
-  ]
-}
-```
-
 ### 관심 카테고리 조회
 
 `GET /category/users/:id`
@@ -138,6 +119,27 @@
 경매 응답: `id, title, isOngoing, remaining(시:분), highestPoint, favoriteCount`
 
 > 경매 상세 페이지 API는 디자인 대기 중 (미구현)
+
+### 특정 그룹의 상품 목록 조회 (신규)
+
+`GET /products/groups/:id`
+
+```json
+{
+  "data": [
+    {
+      "id": 5,
+      "title": "아이폰 13 팝니다",
+      "money_price": 500000,
+      "point_price": null,
+      "type": "general",
+      "img": "url1"
+    }
+  ]
+}
+```
+
+> ⚠️ 이전 버전 문서엔 `/category/groups/:id/products`로 잘못 기재되어 있었음. 실제 서버 라우터 및 `api-tester.html` 기준으로 `/products/groups/:id`가 맞는 경로.
 
 ### 상세 조회
 
@@ -360,6 +362,88 @@
 | `DELETE /posts/comments/:commentId` | 댓글 삭제 (작성자만)                |
 
 ---
+
+# 실시간 상품 시청자 기능 구현 문서
+
+상품 상세 페이지 진입 시 해당 상품을 실시간으로 보고 있는 **시청자 수(count)** 및 **시청자 프로필 정보(userId, userName, userImg)**를 Socket.IO를 통해 브로드캐스트하는 기능입니다.
+
+---
+
+## 1. 백엔드 구현 (Node.js & Socket.IO)
+
+### 1) `src/sockets/productSocket.js` (신규 생성)
+
+```javascript
+/**
+ * 실시간 상품 시청자 전용 소켓 이벤트 모듈
+ */
+module.exports = function setupProductSockets(io) {
+  // 방 단위 시청자 정보 집계 및 브로드캐스트
+  async function updateRoomViewers(roomName) {
+    try {
+      const sockets = await io.in(roomName).fetchSockets();
+
+      const viewers = sockets.map((s) => s.userData).filter(Boolean);
+
+      io.to(roomName).emit("product_viewers_updated", {
+        count: viewers.length,
+        viewers: viewers,
+      });
+    } catch (error) {
+      console.error(`[Socket Error] ${roomName} 시청자 집계 실패:`, error);
+    }
+  }
+
+  io.on("connection", (socket) => {
+    // 1. 상품 상세 페이지 진입
+    socket.on("join_product", async (data) => {
+      const { productId, userId, userName, userImg } = data || {};
+      if (!productId) return;
+
+      const roomName = `product_${productId}`;
+
+      if (!socket.rooms.has(roomName)) {
+        await socket.join(roomName);
+      }
+
+      socket.currentProductRoom = roomName;
+      socket.userData = {
+        userId: userId || `guest_${socket.id.substring(0, 5)}`,
+        userName: userName || "익명 사용자",
+        userImg: userImg || null,
+        joinedAt: new Date(),
+      };
+
+      await updateRoomViewers(roomName);
+    });
+
+    // 2. 상품 상세 페이지 이탈
+    socket.on("leave_product", async (data) => {
+      const { productId } = data || {};
+      const roomName = productId
+        ? `product_${productId}`
+        : socket.currentProductRoom;
+
+      if (roomName && socket.rooms.has(roomName)) {
+        await socket.leave(roomName);
+        delete socket.currentProductRoom;
+        delete socket.userData;
+
+        await updateRoomViewers(roomName);
+      }
+    });
+
+    // 3. 앱 종료/네트워크 연결 끊김 처리
+    socket.on("disconnecting", async () => {
+      for (const roomName of socket.rooms) {
+        if (roomName.startsWith("product_")) {
+          setImmediate(() => updateRoomViewers(roomName));
+        }
+      }
+    });
+  });
+};
+```
 
 ## 아직 준비 중
 
