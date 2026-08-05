@@ -36,10 +36,10 @@ class _SignInPageState extends State<SignInPage> {
   // 소셜 로그인 로고 이미지를 원형 아이콘 형태로 보여주는 헬퍼
   Widget _socialImageIcon(String assetPath) {
     return CircleAvatar(
-      radius: 26,
+      radius: 22,
       backgroundColor: Colors.white12,
       child: Padding(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(10),
         child: Image.asset(assetPath, fit: BoxFit.contain),
       ),
     );

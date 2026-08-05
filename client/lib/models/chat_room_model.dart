@@ -4,6 +4,7 @@ class ChatRoomModel {
   final String opponentId;
   final String opponentName;
   final String? opponentAvatarUrl;
+  final String? itemImageUrl; // 👈 1. 게시물(상품) 사진 URL 필드 추가
   final String lastMessage;
   final DateTime lastMessageAt;
   final int unreadCount;
@@ -14,6 +15,7 @@ class ChatRoomModel {
     required this.opponentId,
     required this.opponentName,
     this.opponentAvatarUrl,
+    this.itemImageUrl, // 👈 2. 생성자에 추가 (기본값 null)
     required this.lastMessage,
     required this.lastMessageAt,
     this.unreadCount = 0,
@@ -26,6 +28,7 @@ class ChatRoomModel {
       opponentId: json['opponentId'].toString(),
       opponentName: json['opponentName'] as String,
       opponentAvatarUrl: json['opponentAvatarUrl'] as String?,
+      itemImageUrl: json['itemImageUrl'] as String?, // 👈 3. JSON 파싱 처리 추가
       lastMessage: json['lastMessage'] as String? ?? '',
       lastMessageAt: DateTime.parse(json['lastMessageAt'] as String),
       unreadCount: json['unreadCount'] as int? ?? 0,

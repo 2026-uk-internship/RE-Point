@@ -8,10 +8,14 @@ import '../widgets/custom_bottom_nav.dart';
 
 /// 앱의 메인 셸(shell) 화면.
 ///
-/// 이 화면 하나가 Scaffold + 하단 네비게이션을 담당하고,
+/// 이 화면 하나가 Scaffold를 담당하고,
 /// 홈/지도/검색/채팅/마이페이지는 전부 "탭 콘텐츠(body)"로만 존재합니다.
 /// (각 탭 화면은 자체 Scaffold나 BottomNavigationBar를 갖지 않아야 합니다 -
 ///  두 개가 겹치면 네비게이션 바가 중복으로 나옵니다.)
+///
+/// 하단 네비게이션은 더 이상 Scaffold.bottomNavigationBar가 아니라
+/// Stack + Align으로 탭 콘텐츠 위에 "떠 있는" 형태로 겹쳐서 배치합니다
+/// (둥글고 반투명한 유리 느낌 디자인을 위함, custom_bottom_nav.dart 참고).
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -34,15 +38,24 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() => _currentIndex = index);
-        },
+      // 하단 네비가 콘텐츠 위에 떠 있는 구조이므로 body를 화면 끝까지 확장
+      extendBody: true,
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _currentIndex,
+            children: _pages,
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: CustomBottomNav(
+              currentIndex: _currentIndex,
+              onTap: (index) {
+                setState(() => _currentIndex = index);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

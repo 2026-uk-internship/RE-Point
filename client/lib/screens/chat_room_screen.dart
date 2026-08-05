@@ -3,6 +3,9 @@ import '../models/message_model.dart';
 import '../services/chat_service.dart';
 import '../theme/chat_theme.dart';
 import '../widgets/chat_bubble.dart';
+import 'schedule_page.dart';
+import 'chat_search_page.dart';
+import 'report_listing_dialog.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
@@ -131,16 +134,42 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _closeMenu();
     switch (option) {
       case ChatMenuOption.schedule:
-        // TODO: 일정 관리 화면으로 이동
+        final pickedDate = await Navigator.push<DateTime>(
+          context,
+          MaterialPageRoute(builder: (_) => const SchedulePage()),
+        );
+        if (pickedDate != null && mounted) {
+          // TODO: 선택된 픽업 날짜(pickedDate)를 서버에 저장하거나
+          // 채팅방에 시스템 메시지로 남기는 로직 연결
+        }
         break;
       case ChatMenuOption.search:
-        // TODO: 채팅 내 검색 UI 열기
+        final selectedMessage = await Navigator.push<MessageModel>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatSearchPage(
+              roomId: widget.roomId,
+              opponentName: widget.opponentName,
+              opponentAvatarUrl: widget.opponentAvatarUrl,
+            ),
+          ),
+        );
+        if (selectedMessage != null && mounted) {
+          // TODO: 선택된 메시지(selectedMessage) 위치로 채팅 리스트를 스크롤
+          // 예: _messages에서 index를 찾아 _scrollController로 이동
+        }
         break;
       case ChatMenuOption.mute:
         await _chatService.toggleNotification(widget.roomId, true);
         break;
       case ChatMenuOption.report:
-        // TODO: 신고 화면/다이얼로그 열기
+        final reasons = await showReportListingDialog(context);
+        if (reasons != null && mounted) {
+          // TODO: 선택된 reasons로 신고 API 호출
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Report submitted. Thank you.')),
+          );
+        }
         break;
       case ChatMenuOption.leave:
         await _showLeaveConfirmDialog();
@@ -341,7 +370,7 @@ class _ChatOptionsMenu extends StatelessWidget {
             _menuItem(Icons.event_note_rounded, 'Doing schedule', ChatMenuOption.schedule),
             _menuItem(Icons.search_rounded, 'Searching for Chat', ChatMenuOption.search),
             _menuItem(Icons.notifications_off_rounded, 'Turn off notifications', ChatMenuOption.mute),
-            _menuItem(Icons.error_outline_rounded, 'Report', ChatMenuOption.report),
+            _menuItem(Icons.error_outline_rounded, 'Report User', ChatMenuOption.report),
             _menuItem(
               Icons.logout_rounded,
               'Going out to the chat room',
