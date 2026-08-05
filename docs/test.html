@@ -363,8 +363,13 @@
                 }
             }
             const res = await fetch(base() + path, { method, headers, body: fetchBody });
+            const text = await res.text();
             let data;
-            try { data = await res.json(); } catch (e) { data = { raw: await res.text() }; }
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                data = { raw: text };
+            }
             return { status: res.status, data };
         }
 
@@ -396,7 +401,7 @@
             show('out-category', await api('GET', '/category/groups'));
         }
         async function getProductsByGroup() {
-            show('out-category', await api('GET', `/category/groups/${val('cat-group-id')}/products`));
+            show('out-category', await api('GET', `/products/groups/${val('cat-group-id')}`));
         }
 
         // 4. 지역
