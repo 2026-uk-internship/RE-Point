@@ -155,3 +155,16 @@ exports.getRelatedBySeller = async (req, res) => {
       .json({ message: "An internal server error occurred." });
   }
 };
+
+exports.getProductsByGroup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const products = await productModel.getProductsByGroup(id);
+    return res.status(200).json({ data: products });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ message: "An internal server error occurred." });
+  }
+};

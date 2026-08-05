@@ -65,6 +65,40 @@
 
 `GET /category` — 알파벳순 정렬. `point_rate`, `co2_saved` 포함.
 
+### 카테고리 그룹 목록 조회 (신규)
+
+`GET /category/groups`
+
+```json
+{
+  "data": [
+    { "id": 1, "name": "Shopping" },
+    { "id": 2, "name": "Clothing" },
+    { "id": 3, "name": "School" },
+    { "id": 4, "name": "Devices" }
+  ]
+}
+```
+
+### 특정 그룹의 상품 목록 조회 (신규)
+
+`GET /category/groups/:id/products`
+
+```json
+{
+  "data": [
+    {
+      "id": 5,
+      "title": "아이폰 13 팝니다",
+      "money_price": 500000,
+      "point_price": null,
+      "type": "general",
+      "img": "url1"
+    }
+  ]
+}
+```
+
 ### 관심 카테고리 조회
 
 `GET /category/users/:id`

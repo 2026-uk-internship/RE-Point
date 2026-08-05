@@ -302,3 +302,27 @@ exports.searchProducts = async (keyword) => {
     img: row.img,
   }));
 };
+
+exports.getProductsByGroup = async (groupId) => {
+  const [rows] = await pool.query(
+    `SELECT p.id, p.title, p.money_price, p.point_price, p.type,
+       (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img
+     FROM products p
+     JOIN category c ON c.id = p.category_id
+     WHERE c.group_id = ? AND p.status = 'sale'
+     ORDER BY p.created_at DESC`,
+    [groupId],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    price:
+      row.type === "general"
+        ? row.money_price
+        : row.type === "point"
+          ? row.point_price
+          : null,
+    type: row.type,
+    img: row.img,
+  }));
+};
