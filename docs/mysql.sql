@@ -30,6 +30,7 @@ CREATE TABLE users (
     point INTEGER DEFAULT 100 CHECK (point >= 0),
     location_id INTEGER,
     temperature INTEGER DEFAULT 0,
+    last_active_at DATETIME DEFAULT CURRENT_TIMESTAMP,   -- 추가: 최근 활동 시각 (공개 프로필의 'n시간 전' 표시용)
 
     FOREIGN KEY (id) REFERENCES auth(id)
 		ON DELETE CASCADE
@@ -142,7 +143,7 @@ CREATE TABLE category (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL UNIQUE,
     point_rate DECIMAL(10, 2) NOT NULL,
-    co2_saved DECIMAL(10, 2) DEFAULT 0            -- 변경: 탄소 절감량 추정 가중치 (kg CO2)
+    co2_saved DECIMAL(10, 2) DEFAULT 0            -- 탄소 절감량 추정 가중치 (kg CO2)
 );
 
 CREATE TABLE user_category (
@@ -303,7 +304,7 @@ CREATE TABLE reports (
     user_id INTEGER,
     date DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('in_progress', 'end') DEFAULT 'in_progress',
-    type ENUM('user', 'chat', 'product', 'review') NOT NULL,   -- 변경: review 추가
+    type ENUM('user', 'chat', 'product', 'review') NOT NULL,
     contents TEXT,
     related_id INTEGER,
 
@@ -331,7 +332,7 @@ CREATE TABLE posts (
     user_id INTEGER,
 
     FOREIGN KEY (user_id) REFERENCES users(id)
-        ON DELETE SET NULL
+        ON DELETE SET NULL          -- 수정: NOT NULL -> SET NULL (탈퇴 시 작성자만 NULL 처리)
         ON UPDATE CASCADE
 );
 
@@ -342,7 +343,7 @@ CREATE TABLE comments (
     post_id INTEGER NOT NULL,
 
     FOREIGN KEY (user_id) REFERENCES users(id)
-        ON DELETE SET NULL
+        ON DELETE SET NULL          -- 수정: NOT NULL -> SET NULL
         ON UPDATE CASCADE,
     FOREIGN KEY (post_id) REFERENCES posts(id)
         ON DELETE CASCADE

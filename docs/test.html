@@ -130,6 +130,21 @@
         .row>* {
             flex: 1;
         }
+
+        .thumbs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .thumbs img {
+            width: 70px;
+            height: 70px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
     </style>
 </head>
 
@@ -181,9 +196,35 @@
             <pre id="out-location"></pre>
         </div>
 
+        <!-- 상품 등록 -->
+        <div class="card">
+            <h2>5. 상품 등록</h2>
+            <label>타입</label>
+            <select id="reg-type">
+                <option value="general">일반거래</option>
+                <option value="point">포인트거래</option>
+                <option value="auction">경매</option>
+            </select>
+            <label>제목</label><input id="reg-title" value="테스트 상품" />
+            <label>설명</label><input id="reg-description" value="상태 좋아요" />
+            <label>카테고리 ID</label><input id="reg-category" value="1" />
+            <label>지역(텍스트)</label><input id="reg-location" value="Camden" />
+            <div class="row">
+                <div><label>위도</label><input id="reg-lat" value="51.5390" /></div>
+                <div><label>경도</label><input id="reg-lng" value="-0.1426" /></div>
+            </div>
+            <label>가격 (일반: money_price / 포인트: point_price)</label><input id="reg-price" value="10000" />
+            <label>경매 시작 포인트 (경매일 때만)</label><input id="reg-start-point" value="1000" />
+            <label>경매 종료일시 (경매일 때만, 예: 2026-08-10T23:59:59)</label><input id="reg-end-date"
+                value="2026-08-10T23:59:59" />
+            <label>이미지 (최대 10장)</label><input id="reg-images" type="file" multiple accept="image/*" />
+            <button onclick="createProduct()">상품 등록</button>
+            <pre id="out-register"></pre>
+        </div>
+
         <!-- 상품 목록 -->
         <div class="card">
-            <h2>5. 상품 목록</h2>
+            <h2>6. 상품 목록</h2>
             <label>타입</label>
             <select id="list-type">
                 <option value="general">일반거래</option>
@@ -203,7 +244,7 @@
 
         <!-- 상품 상세 -->
         <div class="card">
-            <h2>6. 상품 상세 / 관련 상품</h2>
+            <h2>7. 상품 상세 / 관련 상품</h2>
             <label>Product ID</label><input id="detail-id" value="1" />
             <div class="row">
                 <button onclick="getProductDetail()">상세 조회</button>
@@ -214,11 +255,12 @@
                 <button class="secondary" onclick="getRelated('seller')">같은 판매자</button>
             </div>
             <pre id="out-detail"></pre>
+            <div id="detail-images" class="thumbs"></div>
         </div>
 
         <!-- 검색 -->
         <div class="card">
-            <h2>7. 검색</h2>
+            <h2>8. 검색</h2>
             <label>키워드</label><input id="search-keyword" value="아이폰" />
             <div class="row">
                 <button onclick="searchProducts()">상품 검색</button>
@@ -232,7 +274,7 @@
 
         <!-- 채팅방 -->
         <div class="card">
-            <h2>8. 채팅방</h2>
+            <h2>9. 채팅방</h2>
             <button onclick="getRooms()">내 채팅방 목록</button>
             <label>채팅 시작할 Product ID</label><input id="room-product-id" value="1" />
             <button class="secondary" onclick="createRoom()">채팅방 생성/입장</button>
@@ -241,7 +283,7 @@
 
         <!-- 신고 -->
         <div class="card">
-            <h2>9. 신고</h2>
+            <h2>10. 신고</h2>
             <label>타입</label>
             <select id="report-type">
                 <option value="product">product</option>
@@ -257,7 +299,7 @@
 
         <!-- 프로필 -->
         <div class="card">
-            <h2>10. 프로필</h2>
+            <h2>11. 프로필</h2>
             <button onclick="getProfile()">내 프로필 조회</button>
             <label>다른 사용자 ID</label><input id="public-profile-id" value="2" />
             <button class="secondary" onclick="getPublicProfile()">공개 프로필 조회</button>
@@ -266,7 +308,7 @@
 
         <!-- 게시판 -->
         <div class="card">
-            <h2>11. 게시판</h2>
+            <h2>12. 게시판</h2>
             <label>제목</label><input id="post-title" value="테스트 게시글" />
             <label>내용</label><input id="post-contents" value="내용입니다" />
             <label>지역</label><input id="post-location" value="Camden" />
@@ -309,7 +351,7 @@
             let fetchBody = undefined;
             if (body !== undefined) {
                 if (isForm) {
-                    fetchBody = body; // FormData
+                    fetchBody = body; // FormData — Content-Type은 브라우저가 자동으로 boundary 붙여서 설정
                 } else {
                     headers['Content-Type'] = 'application/json';
                     fetchBody = JSON.stringify(body);
@@ -354,25 +396,70 @@
             show('out-location', await api('PUT', '/users/me/location', { locationId: Number(val('loc-id')) }, true));
         }
 
-        // 5. 상품 목록
+        // 5. 상품 등록 (이미지 포함, multipart/form-data)
+        async function createProduct() {
+            const type = val('reg-type');
+            const form = new FormData();
+
+            form.append('title', val('reg-title'));
+            form.append('description', val('reg-description'));
+            form.append('type', type);
+            form.append('category_id', val('reg-category'));
+            form.append('location', val('reg-location'));
+            form.append('latitude', val('reg-lat'));
+            form.append('longitude', val('reg-lng'));
+
+            if (type === 'general') {
+                form.append('money_price', val('reg-price'));
+            } else if (type === 'point') {
+                form.append('point_price', val('reg-price'));
+            } else if (type === 'auction') {
+                form.append('start_point', val('reg-start-point'));
+                form.append('end_date', val('reg-end-date'));
+            }
+
+            const files = document.getElementById('reg-images').files;
+            for (let i = 0; i < files.length; i++) {
+                form.append('images', files[i]);
+            }
+
+            show('out-register', await api('POST', '/products', form, true, true));
+        }
+
+        // 6. 상품 목록
         async function getProductList() {
             const type = val('list-type');
             const sort = val('list-sort');
             show('out-list', await api('GET', `/products/${type}?sort=${sort}`));
         }
 
-        // 6. 상품 상세
+        // 7. 상품 상세
         async function getProductDetail() {
-            show('out-detail', await api('GET', `/products/${val('detail-id')}`));
+            const r = await api('GET', `/products/${val('detail-id')}`);
+            show('out-detail', r);
+            renderImages('detail-images', r.data && r.data.images);
         }
         async function toggleFavorite() {
             show('out-detail', await api('POST', `/products/${val('detail-id')}/favorite`, {}, true));
         }
         async function getRelated(kind) {
-            show('out-detail', await api('GET', `/products/${val('detail-id')}/related-${kind}`));
+            const r = await api('GET', `/products/${val('detail-id')}/related-${kind}`);
+            show('out-detail', r);
+            document.getElementById('detail-images').innerHTML = '';
         }
 
-        // 7. 검색
+        function renderImages(containerId, images) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            if (!Array.isArray(images)) return;
+            images.forEach((url) => {
+                const img = document.createElement('img');
+                img.src = url;
+                container.appendChild(img);
+            });
+        }
+
+        // 8. 검색
         async function searchProducts() {
             show('out-search', await api('GET', `/search?keyword=${encodeURIComponent(val('search-keyword'))}`, undefined, true));
         }
@@ -383,7 +470,7 @@
             show('out-search', await api('GET', '/search/recent', undefined, true));
         }
 
-        // 8. 채팅방
+        // 9. 채팅방
         async function getRooms() {
             show('out-rooms', await api('GET', '/rooms', undefined, true));
         }
@@ -391,14 +478,14 @@
             show('out-rooms', await api('POST', '/rooms', { productId: Number(val('room-product-id')) }, true));
         }
 
-        // 9. 신고
+        // 10. 신고
         async function createReport() {
             show('out-report', await api('POST', '/report', {
                 type: val('report-type'), related_id: Number(val('report-related-id')), contents: val('report-contents'),
             }, true));
         }
 
-        // 10. 프로필
+        // 11. 프로필
         async function getProfile() {
             show('out-profile', await api('GET', '/users/me', undefined, true));
         }
@@ -406,7 +493,7 @@
             show('out-profile', await api('GET', `/users/${val('public-profile-id')}/profile`));
         }
 
-        // 11. 게시판
+        // 12. 게시판
         async function createPost() {
             show('out-post', await api('POST', '/posts', {
                 title: val('post-title'), contents: val('post-contents'), location: val('post-location'),
