@@ -12,6 +12,7 @@ router.post(
   upload.array("images", 10),
   productController.createProduct,
 );
+router.get("/groups/:id", productController.getProductsByGroup); // GET /products/groups/:id
 router.get("/general", productController.getGeneralList);
 router.get("/point", productController.getPointList);
 router.get("/auctions", productController.getAuctionList);

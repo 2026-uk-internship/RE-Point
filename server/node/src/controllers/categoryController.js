@@ -57,3 +57,28 @@ exports.setUserCategories = async (req, res) => {
       .json({ message: "An internal server error occurred." });
   }
 };
+
+exports.getGroups = async (req, res) => {
+  try {
+    const groups = await categoryModel.getAllGroups();
+    return res.status(200).json({ data: groups });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ message: "An internal server error occurred." });
+  }
+};
+
+exports.getGroupCategories = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const categories = await categoryModel.getCategoriesByGroup(id);
+    return res.status(200).json({ data: categories });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ message: "An internal server error occurred." });
+  }
+};
