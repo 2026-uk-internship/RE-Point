@@ -35,7 +35,9 @@ app.use("/products", productRoutes);
 app.use("/rooms", roomRoutes);
 app.use("/posts", postRoutes);
 
+// 소켓 모듈 등록
 require("./sockets/chatSocket")(io);
+require("./sockets/productSocket")(io);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
