@@ -461,3 +461,51 @@ class BoardService {
     return jsonDecode(res.body);
   }
 }
+
+// ------------------------------------------------------
+// 11. 실시간 상품 시청자 전용 소켓 서비스
+// ------------------------------------------------------
+class ProductSocketService {
+  late io.Socket socket;
+
+  // 소켓 연결
+  void connect() {
+    socket = io.io(
+      ApiConfig.baseUrl,
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .setAuth({'token': ApiConfig.token})
+          .disableAutoConnect()
+          .build(),
+    );
+
+    socket.connect();
+  }
+
+  // 상품 상세 진입 이벤트 전송
+  void joinProduct({required int productId, int? userId, String? userName}) {
+    socket.emit('join_product', {
+      'productId': productId,
+      'userId': userId,
+      'userName': userName,
+    });
+  }
+
+  // 상품 상세 이탈 이벤트 전송
+  void leaveProduct(int productId) {
+    socket.emit('leave_product', {'productId': productId});
+  }
+
+  // 실시간 시청자 수/목록 수신 리스너 등록
+  void onProductViewersUpdated(Function(dynamic) callback) {
+    socket.on('product_viewers_updated', callback);
+  }
+
+  // 실시간 시청자 리스너 해제
+  void offProductViewersUpdated() {
+    socket.off('product_viewers_updated');
+  }
+
+  // 소켓 연결 끊기
+  void disconnect() => socket.disconnect();
+}
