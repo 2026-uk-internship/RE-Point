@@ -87,6 +87,8 @@ class CategoryService {
     return jsonDecode(res.body);
   }
 
+  // ⚠️ 서버 실제 라우트는 /products/groups/:id 로 확인됨.
+  // 아래는 예전 경로라 404가 날 수 있음 — ProductService.getProductsByGroup() 사용 권장.
   static Future<Map<String, dynamic>> getProductsByGroup(int groupId) async {
     final res = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/category/groups/$groupId/products'),
@@ -124,6 +126,14 @@ class ProductService {
   }) async {
     final res = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/products/$type?sort=$sort'),
+    );
+    return jsonDecode(res.body);
+  }
+
+  // 실제 서버 라우트: GET /products/groups/:id
+  static Future<Map<String, dynamic>> getProductsByGroup(int groupId) async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/groups/$groupId'),
     );
     return jsonDecode(res.body);
   }
@@ -204,6 +214,132 @@ class ProductService {
 
     final streamedRes = await req.send();
     final res = await http.Response.fromStream(streamedRes);
+    return jsonDecode(res.body);
+  }
+
+  // ---------------------------------------------------------
+  // 마이페이지 - 판매 목록
+  // GET /products/me/selling, /me/sold, /me/auctions/selling, /me/auctions/sold
+  // ---------------------------------------------------------
+  static Future<Map<String, dynamic>> getMySelling() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/selling'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getMySold() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/sold'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getMySellingAuctions() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/auctions/selling'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getMySoldAuctions() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/auctions/sold'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  // ---------------------------------------------------------
+  // 마이페이지 - 최근 본 목록
+  // GET /products/me/recent/general, /me/recent/auctions
+  // ---------------------------------------------------------
+  static Future<Map<String, dynamic>> getRecentGeneral() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/recent/general'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getRecentAuctions() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/recent/auctions'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  // ---------------------------------------------------------
+  // 마이페이지 - 좋아요 목록
+  // GET /products/me/favorites/general, /me/favorites/auctions
+  // ---------------------------------------------------------
+  static Future<Map<String, dynamic>> getFavoritedGeneral() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/favorites/general'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getFavoritedAuctions() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/favorites/auctions'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  // ---------------------------------------------------------
+  // 마이페이지 - 경매 참여 목록 (입찰중 / 낙찰성공 / 낙찰실패)
+  // GET /products/me/bidding/ongoing, /won, /lost
+  // ---------------------------------------------------------
+  static Future<Map<String, dynamic>> getBiddingOngoing() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/bidding/ongoing'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getBiddingWon() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/bidding/won'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getBiddingLost() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/bidding/lost'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  // ---------------------------------------------------------
+  // 경매 상세 / 참여자 목록
+  // GET /products/auctions/:id, /products/auctions/:id/participants
+  // ---------------------------------------------------------
+  static Future<Map<String, dynamic>> getAuctionDetail(int auctionId) async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/auctions/$auctionId'),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getAuctionParticipants(
+    int auctionId,
+  ) async {
+    final res = await http.get(
+      Uri.parse(
+        '${ApiConfig.baseUrl}/products/auctions/$auctionId/participants',
+      ),
+    );
     return jsonDecode(res.body);
   }
 }

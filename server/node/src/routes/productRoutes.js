@@ -55,5 +55,15 @@ router.get("/me/bidding/won", verifyToken, productController.getMyBiddingWon); /
 router.get("/me/bidding/lost", verifyToken, productController.getMyBiddingLost); // GET /products/me/bidding/lost
 router.get("/auctions/:id", productController.getAuctionDetail); // GET /products/auctions/:id
 router.get("/auctions/:id/participants", bidController.getAuctionParticipants); // GET /products/auctions/:id/participants
+router.get(
+  "/me/favorites/general",
+  verifyToken,
+  productController.getFavoritedGeneral,
+); // GET /products/me/favorites/general
+router.get(
+  "/me/favorites/auctions",
+  verifyToken,
+  productController.getFavoritedAuction,
+); // GET /products/me/favorites/auctions
 
 module.exports = router;

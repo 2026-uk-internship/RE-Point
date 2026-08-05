@@ -118,8 +118,6 @@
 일반/포인트 응답: `id, title, price, location, favoriteCount`
 경매 응답: `id, title, isOngoing, remaining(시:분), highestPoint, favoriteCount`
 
-> 경매 상세 페이지 API는 디자인 대기 중 (미구현)
-
 ### 특정 그룹의 상품 목록 조회 (신규)
 
 `GET /products/groups/:id`
@@ -173,6 +171,97 @@
 
 `POST /products/:id/favorite`
 응답: `{ "data": { "favorited": true, "favoriteCount": 5 } }` — 최신 찜 개수까지 같이 와서 프론트에서 바로 반영 가능
+
+### 마이페이지 - 판매 목록
+
+| API                                 | 설명                                                                |
+| ----------------------------------- | ------------------------------------------------------------------- |
+| `GET /products/me/selling`          | 내가 판매 중인 일반 상품 (판매자=나, 타입=general/point, 상태=sale) |
+| `GET /products/me/sold`             | 내가 판매 완료한 일반 상품 (상태=sold)                              |
+| `GET /products/me/auctions/selling` | 내가 판매 중인 경매 (아직 종료 안 됨)                               |
+| `GET /products/me/auctions/sold`    | 내가 판매 완료한 경매 (종료 및 낙찰 완료)                           |
+
+(모두 인증 필요)
+
+### 마이페이지 - 최근 본 목록
+
+| API                                | 설명                         |
+| ---------------------------------- | ---------------------------- |
+| `GET /products/me/recent/general`  | 최근 조회한 일반/포인트 상품 |
+| `GET /products/me/recent/auctions` | 최근 조회한 경매             |
+
+(모두 인증 필요)
+
+### 마이페이지 - 경매 참여 목록
+
+내가 입찰한 경매를 진행 상태별로 분리해서 반환.
+
+| API                                | 설명                                    |
+| ---------------------------------- | --------------------------------------- |
+| `GET /products/me/bidding/ongoing` | 내가 입찰했고 아직 종료되지 않은 경매   |
+| `GET /products/me/bidding/won`     | 내가 최종 낙찰자인 경매                 |
+| `GET /products/me/bidding/lost`    | 내가 입찰했지만 다른 사람이 낙찰된 경매 |
+
+(모두 인증 필요)
+
+### 마이페이지 - 좋아요 목록
+
+| API                                   | 설명                       |
+| ------------------------------------- | -------------------------- |
+| `GET /products/me/favorites/general`  | 내가 찜한 일반/포인트 상품 |
+| `GET /products/me/favorites/auctions` | 내가 찜한 경매             |
+
+(모두 인증 필요)
+
+### 경매 상세 조회
+
+`GET /products/auctions/:id`
+
+경매 상세 페이지에 필요한 정보를 한 번에 반환.
+
+```json
+{
+  "id": 9,
+  "title": "...",
+  "description": "...",
+  "images": ["url1", "url2"],
+  "category": "...",
+  "favoriteCount": 3,
+  "remaining": "12h 35m left",
+  "seller": {
+    "name": "...",
+    "img": "...",
+    "city": "Camden",
+    "temperatureLevel": "warm"
+  },
+  "highestPoint": 1500,
+  "highestUserImg": "...",
+  "participantCount": 7,
+  "relatedAuctions": [
+    { "id": 12, "title": "...", "img": "url3", "highestPoint": 800 }
+  ]
+}
+```
+
+`remaining`은 `00h 00m left` 형식. `relatedAuctions`는 같은 카테고리의 다른 경매 상품.
+
+### 경매 참여자 목록
+
+`GET /products/auctions/:id/participants`
+
+```json
+{
+  "data": [
+    {
+      "userName": "Alice",
+      "userImg": "url1",
+      "point": 1200,
+      "biddedHoursAgo": "2 hours ago",
+      "isHighest": true
+    }
+  ]
+}
+```
 
 ---
 
