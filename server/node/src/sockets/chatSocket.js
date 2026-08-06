@@ -24,9 +24,22 @@ module.exports = (io) => {
   io.on("connection", (socket) => {
     console.log(`User connected: ${socket.user.id}`);
 
+    // 이 소켓이 현재 "채팅 화면"으로 보고 있는 방 하나만 추적.
+    // join_room이 호출될 때마다 이전 방은 반드시 leave 시켜서
+    // 소켓이 여러 방에 동시에 물려있지 않도록 강제함.
+    let activeRoomId = null;
+
     // 특정 채팅방(room)에 입장
     socket.on("join_room", async (roomId) => {
+      // 이미 다른 방을 보고 있었다면 먼저 나가기.
+      // 클라이언트가 leave_room을 못 보내는 경우(예: 강제 종료, 네트워크 끊김 후 재연결)에도
+      // 서버가 스스로 정리하는 안전망 역할.
+      if (activeRoomId && activeRoomId !== roomId) {
+        socket.leave(`room_${activeRoomId}`);
+      }
+
       socket.join(`room_${roomId}`);
+      activeRoomId = roomId;
 
       const roomInfo = await roomModel.getRoomInfo(roomId, socket.user.id);
       socket.emit("room_info", {
@@ -40,6 +53,15 @@ module.exports = (io) => {
 
       const history = await chatModel.getMessagesByRoom(roomId);
       socket.emit("chat_history", history);
+    });
+
+    // 채팅방 나가기 (화면 dispose, 뒤로가기, 메뉴의 leave 등에서 호출됨)
+    // 클라이언트 ChatService.leaveChatRoom() / dispose()가 이걸 emit함.
+    socket.on("leave_room", (roomId) => {
+      socket.leave(`room_${roomId}`);
+      if (activeRoomId === roomId) {
+        activeRoomId = null;
+      }
     });
 
     // 메시지 전송
@@ -77,6 +99,10 @@ module.exports = (io) => {
         .emit("user_stop_typing", { userId: socket.user.id });
     });
 
+    // 연결 종료 시(로그아웃, 앱 종료, 네트워크 끊김 등).
+    // socket.io는 disconnect 시 해당 소켓이 join했던 모든 room에서
+    // 자동으로 빠지므로 room leave를 따로 호출할 필요는 없음.
+    // (activeRoomId 변수 자체도 소켓과 함께 사라짐 — 클로저 안의 지역변수라 별도 정리 불필요)
     socket.on("disconnect", () => {
       console.log(`User disconnected: ${socket.user.id}`);
     });
