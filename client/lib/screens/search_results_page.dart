@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import '../theme/chat_theme.dart';
-import 'item_detail_page.dart';
-import 'auction_detail_page.dart';
 import '../services/api_service.dart';
+import 'item_detail_page.dart';
 
 /// 검색 실행 후 나오는 결과 화면.
 ///
 /// 두 개의 탭으로 나뉩니다:
-/// - Secondhand: 일반 중고 판매 게시물. 돈(£)으로 구매.
-/// - Auctions: 경매 게시물. 포인트(P)로만 참여 가능.
+/// - Secondhand: 돈(£)으로 사는 일반 판매 게시물 (type: general / point)
+/// - Auctions: 포인트로만 참여 가능한 경매 게시물 (type: auction)
 ///
-/// TODO(백엔드 연동): SearchService.search(query, tab, sort) 같은 API로
-/// 교체하고, _secondhandItems / _auctionItems를 실제 응답으로 채우면 됩니다.
+/// ⚠️ TODO: SearchService.searchProducts()의 실제 응답 JSON 구조 문서가 없어서,
+/// item_detail_page.dart / post_auction_page.dart에서 쓰인 필드명 패턴을 참고해
+/// 최대한 추정해서 파싱했습니다. 실행해서 안 맞는 필드가 있으면
+/// _SecondhandResult.fromJson / _AuctionResult.fromJson 안의 키 이름만
+/// 실제 응답에 맞게 고치면 됩니다.
 class SearchResultsPage extends StatefulWidget {
   final String initialQuery;
 
@@ -21,28 +23,36 @@ class SearchResultsPage extends StatefulWidget {
   State<SearchResultsPage> createState() => _SearchResultsPageState();
 }
 
-// ---------------------------------------------------------------------------
-// 더미 데이터 모델
-// ---------------------------------------------------------------------------
-
 class _SecondhandResult {
   final int id;
   final String title;
-  final String timeAgo;
-  final String price; // 예: "£ 5" (돈)
+  final DateTime? createdAt;
+  final int moneyPrice; // 돈(£)
   final int likeCount;
-  final int commentCount;
+  final int chatCount;
   final String? imageUrl;
 
   const _SecondhandResult({
     required this.id,
     required this.title,
-    required this.timeAgo,
-    required this.price,
+    required this.createdAt,
+    required this.moneyPrice,
     required this.likeCount,
-    required this.commentCount,
+    required this.chatCount,
     this.imageUrl,
   });
+
+  factory _SecondhandResult.fromJson(Map<String, dynamic> e) {
+    return _SecondhandResult(
+      id: e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0,
+      title: (e['title'] ?? '').toString(),
+      createdAt: DateTime.tryParse('${e['createdAt'] ?? ''}'),
+      moneyPrice: _asInt(e['moneyPrice'] ?? e['money_price'] ?? e['price']),
+      likeCount: _asInt(e['likeCount']),
+      chatCount: _asInt(e['chatCount'] ?? e['chatRoomCount']),
+      imageUrl: _firstImage(e),
+    );
+  }
 }
 
 class _AuctionResult {
@@ -50,8 +60,8 @@ class _AuctionResult {
   final String title;
   final String location;
   final bool isLive;
-  final String timeLeft;
-  final int pricePoints; // 포인트로만 참여 가능
+  final DateTime? endDate;
+  final int currentBid; // 포인트
   final String? imageUrl;
 
   const _AuctionResult({
@@ -59,10 +69,58 @@ class _AuctionResult {
     required this.title,
     required this.location,
     required this.isLive,
-    required this.timeLeft,
-    required this.pricePoints,
+    required this.endDate,
+    required this.currentBid,
     this.imageUrl,
   });
+
+  factory _AuctionResult.fromJson(Map<String, dynamic> e) {
+    final auction = (e['auction'] is Map) ? e['auction'] as Map : const {};
+    final endDate = DateTime.tryParse(
+      '${auction['endDate'] ?? auction['end_date'] ?? e['endDate'] ?? ''}',
+    );
+    return _AuctionResult(
+      id: e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0,
+      title: (e['title'] ?? '').toString(),
+      location: (e['location'] ?? '').toString(),
+      isLive: (auction['isEnded'] ?? e['isEnded']) != true,
+      endDate: endDate,
+      currentBid: _asInt(auction['currentBid'] ?? auction['startPoint'] ??
+          auction['start_point'] ?? e['pointPrice']),
+      imageUrl: _firstImage(e),
+    );
+  }
+}
+
+int _asInt(dynamic v) {
+  if (v is int) return v;
+  return int.tryParse('$v') ?? 0;
+}
+
+String? _firstImage(Map<String, dynamic> e) {
+  if (e['imgUrl'] != null) return e['imgUrl'].toString();
+  if (e['images'] is List && (e['images'] as List).isNotEmpty) {
+    return (e['images'] as List).first.toString();
+  }
+  return null;
+}
+
+String _formatTimeAgo(DateTime? date) {
+  if (date == null) return '';
+  final diff = DateTime.now().difference(date);
+  if (diff.inDays >= 1) return '${diff.inDays} days ago';
+  if (diff.inHours >= 1) return '${diff.inHours}h ago';
+  if (diff.inMinutes >= 1) return '${diff.inMinutes}m ago';
+  return 'Just now';
+}
+
+String _formatTimeLeft(DateTime? end) {
+  if (end == null) return '';
+  final diff = end.difference(DateTime.now());
+  if (diff.isNegative) return 'Ended';
+  if (diff.inDays >= 1) return '${diff.inDays}d ${diff.inHours % 24}h left';
+  if (diff.inHours >= 1) return '${diff.inHours}h ${diff.inMinutes % 60}m left';
+  return '${diff.inMinutes}m left';
 }
 
 enum _SecondhandSort { newest, nearest, lowestPrice, highestPrice }
@@ -72,15 +130,13 @@ enum _AuctionSort { endingSoon, newest, highestBid, lowestBid }
 class _SearchResultsPageState extends State<SearchResultsPage> {
   late final TextEditingController _searchController;
 
-  // 0: Secondhand, 1: Auctions
-  int _tabIndex = 0;
+  int _tabIndex = 0; // 0: Secondhand, 1: Auctions
+  bool _isLoading = true;
+  String? _errorMessage;
 
   _SecondhandSort _secondhandSort = _SecondhandSort.newest;
   _AuctionSort _auctionSort = _AuctionSort.endingSoon;
 
-  bool _isLoading = true;
-
-  // TODO: 실제 응답 필드명이 다르면 _runSearch()의 파싱 부분만 조정
   List<_SecondhandResult> _secondhandItems = [];
   List<_AuctionResult> _auctionItems = [];
 
@@ -88,60 +144,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   void initState() {
     super.initState();
     _searchController = TextEditingController(text: widget.initialQuery);
-    _runSearch(widget.initialQuery);
-  }
-
-  Future<void> _runSearch(String keyword) async {
-    final trimmed = keyword.trim();
-    if (trimmed.isEmpty) return;
-
-    setState(() => _isLoading = true);
-    try {
-      final res = await SearchService.searchProducts(trimmed);
-      final rawList = (res['data'] is List) ? res['data'] as List : <dynamic>[];
-
-      final secondhand = <_SecondhandResult>[];
-      final auctions = <_AuctionResult>[];
-
-      for (final e in rawList) {
-        final id = e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0;
-        final images = e['images'];
-        final imageUrl = (images is List && images.isNotEmpty) ? images[0]?.toString() : null;
-        final type = e['type']?.toString();
-
-        if (type == 'auction') {
-          final auction = e['auction'] as Map<String, dynamic>?;
-          auctions.add(_AuctionResult(
-            id: id,
-            title: e['title']?.toString() ?? '',
-            location: e['location']?.toString() ?? '',
-            isLive: true,
-            timeLeft: auction?['end_date']?.toString() ?? '',
-            pricePoints: auction?['start_point'] is int ? auction!['start_point'] as int : 0,
-            imageUrl: imageUrl,
-          ));
-        } else {
-          secondhand.add(_SecondhandResult(
-            id: id,
-            title: e['title']?.toString() ?? '',
-            timeAgo: e['createdAt']?.toString() ?? '',
-            price: '£ ${e['money_price'] ?? e['point_price'] ?? 0}',
-            likeCount: e['likeCount'] is int ? e['likeCount'] as int : 0,
-            commentCount: e['commentCount'] is int ? e['commentCount'] as int : 0,
-            imageUrl: imageUrl,
-          ));
-        }
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _secondhandItems = secondhand;
-        _auctionItems = auctions;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    _search(widget.initialQuery);
   }
 
   @override
@@ -150,18 +153,91 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     super.dispose();
   }
 
+  Future<void> _search(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final res = await SearchService.searchProducts(trimmed);
+      final list = (res['data'] is List) ? res['data'] as List : <dynamic>[];
+      final items = list.whereType<Map<String, dynamic>>().toList();
+
+      // type이 'auction'이면 경매, 그 외(general/point 등)는 중고 판매로 분류
+      // TODO: 실제 백엔드의 type 값이 다르면 여기 조건만 바꾸면 됨
+      final secondhand = items
+          .where((e) => e['type'] != 'auction')
+          .map(_SecondhandResult.fromJson)
+          .toList();
+      final auctions = items
+          .where((e) => e['type'] == 'auction')
+          .map(_AuctionResult.fromJson)
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _secondhandItems = secondhand;
+        _auctionItems = auctions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = '검색 중 오류가 발생했어요: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<_SecondhandResult> get _sortedSecondhand {
+    final list = [..._secondhandItems];
+    switch (_secondhandSort) {
+      case _SecondhandSort.newest:
+        list.sort((a, b) => (b.createdAt ?? DateTime(0))
+            .compareTo(a.createdAt ?? DateTime(0)));
+        break;
+      case _SecondhandSort.lowestPrice:
+        list.sort((a, b) => a.moneyPrice.compareTo(b.moneyPrice));
+        break;
+      case _SecondhandSort.highestPrice:
+        list.sort((a, b) => b.moneyPrice.compareTo(a.moneyPrice));
+        break;
+      case _SecondhandSort.nearest:
+        // TODO: 거리순 정렬은 위치 좌표가 필요해서 아직 미구현 (등록순 유지)
+        break;
+    }
+    return list;
+  }
+
+  List<_AuctionResult> get _sortedAuctions {
+    final list = [..._auctionItems];
+    switch (_auctionSort) {
+      case _AuctionSort.endingSoon:
+        list.sort((a, b) =>
+            (a.endDate ?? DateTime(9999)).compareTo(b.endDate ?? DateTime(9999)));
+        break;
+      case _AuctionSort.newest:
+        // TODO: 경매 등록일 필드가 응답에 없으면 id 역순으로 대체
+        list.sort((a, b) => b.id.compareTo(a.id));
+        break;
+      case _AuctionSort.highestBid:
+        list.sort((a, b) => b.currentBid.compareTo(a.currentBid));
+        break;
+      case _AuctionSort.lowestBid:
+        list.sort((a, b) => a.currentBid.compareTo(b.currentBid));
+        break;
+    }
+    return list;
+  }
+
   void _navigateToDetail(int productId) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ItemDetailPage(productId: productId)),
-    );
-  }
-
-  // 경매 게시물은 입찰(Place Bid) UI가 있는 전용 화면으로 이동
-  void _navigateToAuctionDetail(int auctionId) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => AuctionDetailPage(auctionId: auctionId)),
     );
   }
 
@@ -179,16 +255,26 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               const SizedBox(height: 12),
               _buildFilterChips(),
               const SizedBox(height: 8),
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                    : (_tabIndex == 0 ? _buildSecondhandList() : _buildAuctionList()),
-              ),
+              Expanded(child: _buildBody()),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
+    }
+    if (_errorMessage != null) {
+      return Center(
+        child: Text(_errorMessage!, style: const TextStyle(color: Colors.white70)),
+      );
+    }
+    return _tabIndex == 0 ? _buildSecondhandList() : _buildAuctionList();
   }
 
   // ----- 상단 검색창 -----
@@ -222,10 +308,13 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                         hintText: 'Search...',
                         hintStyle: TextStyle(color: ChatColors.textSecondary),
                       ),
-                      onSubmitted: (value) => _runSearch(value),
+                      onSubmitted: (value) => _search(value),
                     ),
                   ),
-                  const Icon(Icons.search, color: ChatColors.textSecondary, size: 20),
+                  GestureDetector(
+                    onTap: () => _search(_searchController.text),
+                    child: const Icon(Icons.search, color: ChatColors.textSecondary, size: 20),
+                  ),
                 ],
               ),
             ),
@@ -350,11 +439,17 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
   // ----- Secondhand 리스트 (돈 £) -----
   Widget _buildSecondhandList() {
+    final items = _sortedSecondhand;
+    if (items.isEmpty) {
+      return const Center(
+        child: Text('No results', style: TextStyle(color: ChatColors.textSecondary)),
+      );
+    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-      itemCount: _secondhandItems.length,
+      itemCount: items.length,
       separatorBuilder: (_, __) => const SizedBox(height: 16),
-      itemBuilder: (context, index) => _secondhandTile(_secondhandItems[index]),
+      itemBuilder: (context, index) => _secondhandTile(items[index]),
     );
   }
 
@@ -371,7 +466,14 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               color: Colors.white10,
               borderRadius: BorderRadius.circular(14),
               image: item.imageUrl != null
-                  ? DecorationImage(image: NetworkImage(item.imageUrl!), fit: BoxFit.cover)
+                  ? DecorationImage(
+                      image: NetworkImage(
+                        item.imageUrl!.startsWith('http')
+                            ? item.imageUrl!
+                            : '${ApiConfig.baseUrl}/${item.imageUrl}',
+                      ),
+                      fit: BoxFit.cover,
+                    )
                   : null,
             ),
             child: item.imageUrl == null
@@ -393,12 +495,12 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.timeAgo,
+                  _formatTimeAgo(item.createdAt),
                   style: const TextStyle(color: ChatColors.textSecondary, fontSize: 11),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  item.price,
+                  '£ ${item.moneyPrice}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,
@@ -408,27 +510,21 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Text(
-                    '${item.likeCount}',
-                    style: const TextStyle(color: ChatColors.textSecondary, fontSize: 11),
-                  ),
-                  const SizedBox(width: 3),
-                  const Icon(Icons.favorite, color: ChatColors.danger, size: 12),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${item.commentCount}',
-                    style: const TextStyle(color: ChatColors.textSecondary, fontSize: 11),
-                  ),
-                  const SizedBox(width: 3),
-                  const Icon(Icons.mode_comment_outlined, color: ChatColors.textSecondary, size: 12),
-                ],
+              Text(
+                '${item.likeCount}',
+                style: const TextStyle(color: ChatColors.textSecondary, fontSize: 11),
               ),
+              const SizedBox(width: 3),
+              const Icon(Icons.favorite, color: ChatColors.danger, size: 12),
+              const SizedBox(width: 8),
+              Text(
+                '${item.chatCount}',
+                style: const TextStyle(color: ChatColors.textSecondary, fontSize: 11),
+              ),
+              const SizedBox(width: 3),
+              const Icon(Icons.chat_bubble_rounded, color: ChatColors.textSecondary, size: 12),
             ],
           ),
         ],
@@ -438,17 +534,23 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
   // ----- Auctions 리스트 (포인트 P) -----
   Widget _buildAuctionList() {
+    final items = _sortedAuctions;
+    if (items.isEmpty) {
+      return const Center(
+        child: Text('No results', style: TextStyle(color: ChatColors.textSecondary)),
+      );
+    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-      itemCount: _auctionItems.length,
+      itemCount: items.length,
       separatorBuilder: (_, __) => const SizedBox(height: 20),
-      itemBuilder: (context, index) => _auctionTile(_auctionItems[index]),
+      itemBuilder: (context, index) => _auctionTile(items[index]),
     );
   }
 
   Widget _auctionTile(_AuctionResult item) {
     return GestureDetector(
-      onTap: () => _navigateToAuctionDetail(item.id),
+      onTap: () => _navigateToDetail(item.id),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -461,7 +563,14 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                   color: Colors.white10,
                   borderRadius: BorderRadius.circular(18),
                   image: item.imageUrl != null
-                      ? DecorationImage(image: NetworkImage(item.imageUrl!), fit: BoxFit.cover)
+                      ? DecorationImage(
+                          image: NetworkImage(
+                            item.imageUrl!.startsWith('http')
+                                ? item.imageUrl!
+                                : '${ApiConfig.baseUrl}/${item.imageUrl}',
+                          ),
+                          fit: BoxFit.cover,
+                        )
                       : null,
                 ),
                 child: item.imageUrl == null
@@ -512,15 +621,14 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               const Icon(Icons.access_time_rounded, color: ChatColors.textSecondary, size: 12),
               const SizedBox(width: 2),
               Text(
-                item.timeLeft,
+                _formatTimeLeft(item.endDate),
                 style: const TextStyle(color: ChatColors.textSecondary, fontSize: 11),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            'P ${item.pricePoints}',
-            // 경매는 돈이 아니라 포인트로만 참여 가능하다는 걸 색으로도 구분
+            'P ${item.currentBid}',
             style: const TextStyle(
               color: ChatColors.accentYellow,
               fontSize: 16,

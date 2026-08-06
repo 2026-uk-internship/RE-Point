@@ -1,4 +1,5 @@
 import 'api_service.dart';
+import 'package:flutter/foundation.dart';
 
 /// 로그인 이후 채워지는 내 프로필 캐시.
 ///
@@ -21,19 +22,43 @@ class CurrentUser {
   static Future<void> refresh() async {
     try {
       final res = await ProfileService.getMyProfile();
+      // 실제 서버 응답 구조를 콘솔에서 확인하기 위한 디버그 로그.
+      // username/location/point 필드명이 아래와 다르면 이 로그로 확인해서
+      // 아래 파싱 부분의 키 이름만 맞춰주면 됩니다.
+      debugPrint('🔍 [Profile] 응답: $res');
+
       final data = (res['data'] is Map<String, dynamic>)
           ? res['data'] as Map<String, dynamic>
           : res;
+      // 일부 API는 유저 정보를 한 단계 더 감싸서 내려주기도 해서
+      // (예: { data: { user: {...} } }) 그 경우도 같이 확인.
+      final user = (data['user'] is Map<String, dynamic>)
+          ? data['user'] as Map<String, dynamic>
+          : data;
 
-      id = data['id'] is int ? data['id'] as int : int.tryParse('${data['id']}');
-      username = data['username']?.toString();
-      email = data['email']?.toString();
-      location = data['location']?.toString() ?? data['locationName']?.toString();
-      final pointValue = data['point'] ?? data['points'];
+      id = user['id'] is int ? user['id'] as int : int.tryParse('${user['id']}');
+      username = user['username']?.toString() ??
+          user['nickname']?.toString() ??
+          user['name']?.toString();
+      email = user['email']?.toString();
+      final rawLocation = user['location'] ?? user['locationName'];
+      location = (rawLocation is Map)
+          ? (rawLocation['name'] ?? rawLocation['location'])?.toString()
+          : rawLocation?.toString();
+      final pointValue = user['point'] ?? user['points'];
       points = pointValue is int ? pointValue : int.tryParse('$pointValue');
-      avatarUrl = data['profileImage']?.toString() ?? data['avatarUrl']?.toString();
+      avatarUrl = user['profileImage']?.toString() ??
+          user['avatarUrl']?.toString() ??
+          user['profile_image']?.toString();
+
+      debugPrint(
+        '🔍 [Profile] 파싱 결과 -> id: $id, username: $username, '
+        'location: $location, points: $points',
+      );
     } catch (e) {
-      // 프로필 조회 실패는 각 화면에서 기본값(더미)으로 표시되도록 조용히 무시합니다.
+      // 프로필 조회 실패 원인을 콘솔에서 확인할 수 있도록 로그만 남기고,
+      // 화면에는 기본값(더미)으로 표시되도록 조용히 무시합니다.
+      debugPrint('🔍 [Profile] 조회 실패: $e');
     }
   }
 
