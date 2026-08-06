@@ -407,10 +407,12 @@ exports.getRecentViewedGeneral = async (userId) => {
   const [rows] = await pool.query(
     `SELECT
        p.id, p.title, p.type, p.money_price, p.point_price,
+       c.name AS categoryName,
        (SELECT pi.img FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) AS img,
        MAX(vp.date) AS viewedAt
      FROM view_product vp
      JOIN products p ON p.id = vp.product_id
+     LEFT JOIN category c ON c.id = p.category_id
      WHERE vp.user_id = ? AND p.type IN ('general', 'point')
      GROUP BY p.id
      ORDER BY viewedAt DESC`,
@@ -422,6 +424,7 @@ exports.getRecentViewedGeneral = async (userId) => {
     title: row.title,
     price: row.type === "general" ? row.money_price : row.point_price,
     img: row.img,
+    categoryName: row.categoryName,
   }));
 };
 
