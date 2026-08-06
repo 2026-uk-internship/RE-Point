@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/message_model.dart';
 import '../services/chat_service.dart';
@@ -36,11 +37,21 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   final GlobalKey _menuButtonKey = GlobalKey();
   OverlayEntry? _menuOverlay;
+  StreamSubscription<MessageModel>? _incomingSub;
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    // 실시간으로 도착하는 메시지를 화면에 반영 (내가 보낸 건 이미 낙관적으로
+    // 추가되어 있으므로 상대방이 보낸 것만 추가)
+    _incomingSub = _chatService.onMessageReceived.listen((message) {
+      if (!mounted) return;
+      if (message.chatRoomId != widget.roomId) return;
+      if (message.isMe) return;
+      setState(() => _messages.add(message));
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    });
   }
 
   Future<void> _loadMessages() async {
@@ -98,8 +109,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   void _openMenu() {
-    final renderBox =
-        _menuButtonKey.currentContext!.findRenderObject() as RenderBox;
+    final renderBox = _menuButtonKey.currentContext!.findRenderObject() as RenderBox;
     final buttonPosition = renderBox.localToGlobal(Offset.zero);
 
     _menuOverlay = OverlayEntry(
@@ -116,7 +126,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           Positioned(
             top: buttonPosition.dy + renderBox.size.height + 6,
             right: 16,
-            child: _ChatOptionsMenu(onSelect: _handleMenuSelect),
+            child: _ChatOptionsMenu(
+              onSelect: _handleMenuSelect,
+            ),
           ),
         ],
       ),
@@ -170,9 +182,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         final reasons = await showReportListingDialog(context);
         if (reasons != null && mounted) {
           // TODO: 선택된 reasons로 실제 신고 API 호출
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Report submitted')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Report submitted')),
+          );
         }
         break;
       case ChatMenuOption.leave:
@@ -186,10 +198,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: ChatColors.cardBackground,
-        title: const Text(
-          'Leave chat room',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Leave chat room', style: TextStyle(color: Colors.white)),
         content: const Text(
           'Are you sure you want to leave this chat room?',
           style: TextStyle(color: ChatColors.textSecondary),
@@ -201,10 +210,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Leave',
-              style: TextStyle(color: ChatColors.danger),
-            ),
+            child: const Text('Leave', style: TextStyle(color: ChatColors.danger)),
           ),
         ],
       ),
@@ -218,6 +224,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   @override
   void dispose() {
+    _incomingSub?.cancel();
     _closeMenu();
     _messageController.dispose();
     _scrollController.dispose();
@@ -235,18 +242,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               _buildTopBar(),
               Expanded(
                 child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(color: Colors.white),
-                      )
+                    ? const Center(child: CircularProgressIndicator(color: Colors.white))
                     : ListView.builder(
                         controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         itemCount: _messages.length,
-                        itemBuilder: (context, index) =>
-                            ChatBubble(message: _messages[index]),
+                        itemBuilder: (context, index) => ChatBubble(message: _messages[index]),
                       ),
               ),
               _buildInputBar(),
@@ -264,26 +265,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new,
-              color: Colors.white,
-              size: 18,
-            ),
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
             onPressed: () => Navigator.maybePop(context),
           ),
           CircleAvatar(
             radius: 18,
             backgroundColor: Colors.white.withOpacity(0.1),
-            backgroundImage: widget.opponentAvatarUrl != null
-                ? NetworkImage(widget.opponentAvatarUrl!)
-                : null,
+            backgroundImage:
+                widget.opponentAvatarUrl != null ? NetworkImage(widget.opponentAvatarUrl!) : null,
             child: widget.opponentAvatarUrl == null
-                ? Text(
-                    widget.opponentName.isNotEmpty
-                        ? widget.opponentName[0]
-                        : '?',
-                    style: const TextStyle(color: Colors.white),
-                  )
+                ? Text(widget.opponentName.isNotEmpty ? widget.opponentName[0] : '?',
+                    style: const TextStyle(color: Colors.white))
                 : null,
           ),
           const SizedBox(width: 10),
@@ -352,23 +344,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               height: 42,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [Color(0xFF8E6FE0), Color(0xFF4B3A78)],
-                ),
+                gradient: LinearGradient(colors: [Color(0xFF8E6FE0), Color(0xFF4B3A78)]),
               ),
               child: _isSending
                   ? const Padding(
                       padding: EdgeInsets.all(10),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Icon(
-                      Icons.send_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
+                  : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
             ),
           ),
         ],
@@ -395,34 +378,16 @@ class _ChatOptionsMenu extends StatelessWidget {
         decoration: BoxDecoration(
           color: ChatColors.cardBackground,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 16),
-          ],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 16)],
         ),
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _menuItem(
-              Icons.event_note_rounded,
-              'Doing schedule',
-              ChatMenuOption.schedule,
-            ),
-            _menuItem(
-              Icons.search_rounded,
-              'Searching for Chat',
-              ChatMenuOption.search,
-            ),
-            _menuItem(
-              Icons.notifications_off_rounded,
-              'Turn off notifications',
-              ChatMenuOption.mute,
-            ),
-            _menuItem(
-              Icons.error_outline_rounded,
-              'Report',
-              ChatMenuOption.report,
-            ),
+            _menuItem(Icons.event_note_rounded, 'Doing schedule', ChatMenuOption.schedule),
+            _menuItem(Icons.search_rounded, 'Searching for Chat', ChatMenuOption.search),
+            _menuItem(Icons.notifications_off_rounded, 'Turn off notifications', ChatMenuOption.mute),
+            _menuItem(Icons.error_outline_rounded, 'Report', ChatMenuOption.report),
             _menuItem(
               Icons.logout_rounded,
               'Going out to the chat room',
@@ -435,12 +400,7 @@ class _ChatOptionsMenu extends StatelessWidget {
     );
   }
 
-  Widget _menuItem(
-    IconData icon,
-    String label,
-    ChatMenuOption option, {
-    Color color = Colors.white,
-  }) {
+  Widget _menuItem(IconData icon, String label, ChatMenuOption option, {Color color = Colors.white}) {
     return InkWell(
       onTap: () => onSelect(option),
       child: Padding(

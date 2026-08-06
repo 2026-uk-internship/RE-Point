@@ -115,6 +115,12 @@ class _HomePageState extends State<HomePage> {
       BoardService.getPosts(),
     ], eagerError: false);
 
+    // 실제 서버 응답 구조를 콘솔에서 확인하기 위한 디버그 로그.
+    // 필드명이 예상과 다르면 이 로그로 실제 키 이름을 확인해서
+    // _parseAuctions / _parseSecondhand 안의 키 이름만 맞춰주면 됩니다.
+    debugPrint('🔍 [Home] auction 응답: ${results[0]}');
+    debugPrint('🔍 [Home] secondhand 응답: ${results[1]}');
+
     if (!mounted) return;
 
     setState(() {
@@ -125,19 +131,27 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  // 상대경로 이미지에 baseUrl을 붙여주는 헬퍼
+  String? _resolveImageUrl(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    return raw.startsWith('http') ? raw : '${ApiConfig.baseUrl}/$raw';
+  }
+
   List<_AuctionItem> _parseAuctions(Map<String, dynamic> res) {
     final rawList = (res['data'] is List) ? res['data'] as List : <dynamic>[];
     return rawList.map((e) {
       final id = e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0;
+      // imgUrl(단일 문자열)이 먼저 오는 경우가 많아서 우선 확인, 없으면 images 리스트 확인
       final images = e['images'];
-      final imageUrl = (images is List && images.isNotEmpty) ? images[0]?.toString() : null;
+      final rawImage = e['imgUrl']?.toString() ??
+          ((images is List && images.isNotEmpty) ? images[0]?.toString() : null);
       final auction = e['auction'] as Map<String, dynamic>?;
       return _AuctionItem(
         id: id,
         title: e['title']?.toString() ?? '',
         price: 'P ${auction?['start_point'] ?? e['point_price'] ?? 0}',
         timeAgo: auction?['end_date']?.toString() ?? '',
-        imageUrl: imageUrl,
+        imageUrl: _resolveImageUrl(rawImage),
       );
     }).toList();
   }
@@ -147,13 +161,14 @@ class _HomePageState extends State<HomePage> {
     return rawList.map((e) {
       final id = e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0;
       final images = e['images'];
-      final imageUrl = (images is List && images.isNotEmpty) ? images[0]?.toString() : null;
+      final rawImage = e['imgUrl']?.toString() ??
+          ((images is List && images.isNotEmpty) ? images[0]?.toString() : null);
       return _SecondhandItem(
         id: id,
         title: e['title']?.toString() ?? '',
         price: '£${e['money_price'] ?? 0}',
         location: e['location']?.toString() ?? '',
-        imageUrl: imageUrl,
+        imageUrl: _resolveImageUrl(rawImage),
       );
     }).toList();
   }
@@ -398,7 +413,7 @@ class _HomePageState extends State<HomePage> {
   // ----- Nearby Secondhand -----
   Widget _buildSecondhandList() {
     return SizedBox(
-      height: 150,
+      height: 180, // 150이었던 걸 늘림 (썸네일130+제목+가격/위치 줄이 150을 넘어서 오버플로우 났었음)
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: nearbySecondhand.length,

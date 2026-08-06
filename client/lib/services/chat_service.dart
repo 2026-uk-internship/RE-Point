@@ -1,98 +1,157 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import '../models/chat_room_model.dart';
 import '../models/message_model.dart';
+import 'api_service.dart';
+import 'current_user.dart';
 
-/// 채팅 관련 데이터를 가져오는 서비스 레이어.
+/// 채팅 관련 데이터를 실제 백엔드(api_service.dart)와 연동하는 서비스 레이어.
 ///
-/// 지금은 더미 데이터를 반환하지만, 실제 백엔드가 준비되면 아래 TODO 부분만
-/// http(REST) 또는 web_socket_channel(실시간) 호출로 교체하면 됩니다.
-/// UI(Screen) 코드는 이 클래스의 메서드 시그니처만 그대로 사용하면 되므로
-/// 백엔드 연동 시 화면 코드를 거의 건드리지 않아도 됩니다.
+/// - 채팅방 목록: REST (ChatRoomService.getRooms)
+/// - 메시지 내역/실시간 송수신: Socket.IO (ChatSocketService)
+///
+/// ⚠️ TODO: chat_room_model.dart / message_model.dart 파일을 직접 못 봐서,
+/// 필드 이름은 화면(chat_list_screen.dart, chat_room_screen.dart)에서 쓰는
+/// 걸 보고 추정했습니다. 컴파일 에러 나면 그 두 모델 파일 내용 보여주세요.
+///
+/// ⚠️ TODO: 서버가 실제로 내려주는 JSON 키 이름(예: opponentName인지
+/// partner.username인지 등)도 문서가 없어서 흔한 패턴으로 추정했습니다.
+/// 실행 후 콘솔에 실제 응답을 print해서 확인하고, 필요하면 _parseRoom /
+/// _parseSingleMessage 안의 키 이름만 바꿔주면 됩니다.
 class ChatService {
-  // 싱글턴으로 사용해도 되고, Provider/Riverpod 등 DI로 주입해도 됩니다.
   static final ChatService instance = ChatService._internal();
   ChatService._internal();
 
-  // TODO: 실제 로그인 사용자 id로 교체 (로그인 모듈에서 가져오기)
-  static const String currentUserId = 'me';
+  // 로그인 시 CurrentUser에 캐싱된 내 사용자 id를 그대로 사용
+  static String get currentUserId => CurrentUser.id?.toString() ?? '';
 
-  static const String _baseUrl = 'https://api.your-domain.com'; // TODO: 실제 API 주소
+  final ChatSocketService _socket = ChatSocketService();
+  bool _isSocketConnected = false;
+  int? _joinedRoomId;
+  Completer<List<MessageModel>>? _pendingHistoryCompleter;
 
-  /// 채팅방 목록 조회
-  /// TODO: GET $_baseUrl/chat-rooms 로 교체
-  Future<List<ChatRoomModel>> fetchChatRooms() async {
-    await Future.delayed(const Duration(milliseconds: 300)); // 네트워크 지연 흉내
+  // 실시간으로 들어오는 메시지를 ChatRoomScreen에 전달하는 스트림
+  final StreamController<MessageModel> _incomingMessageController =
+      StreamController<MessageModel>.broadcast();
+  Stream<MessageModel> get onMessageReceived => _incomingMessageController.stream;
 
-    return [
-      ChatRoomModel(
-        id: 'room_1',
-        opponentId: 'oliver',
-        opponentName: 'Oliver :B',
-        lastMessage: 'Hello :P',
-        lastMessageAt: DateTime.now().subtract(const Duration(minutes: 1)),
-        isOpponentOnline: true,
-      ),
-      ChatRoomModel(
-        id: 'room_2',
-        opponentId: 'pp',
-        opponentName: ':PP',
-        lastMessage: 'I would like to purchase.',
-        lastMessageAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-      ChatRoomModel(
-        id: 'room_3',
-        opponentId: 'james',
-        opponentName: 'James',
-        lastMessage: 'Did you sell it?',
-        lastMessageAt: DateTime.now().subtract(const Duration(days: 7)),
-      ),
-      ChatRoomModel(
-        id: 'room_4',
-        opponentId: 'andrew',
-        opponentName: 'AndreW',
-        lastMessage: "I'm sorry. Someone else...",
-        lastMessageAt: DateTime.now().subtract(const Duration(days: 30)),
-      ),
-    ];
+  void _ensureSocketConnected() {
+    if (_isSocketConnected) return;
+    _socket.connect(
+      onRoomInfo: (data) {
+        // TODO: 방 참여자 정보 등이 필요하면 여기서 처리
+      },
+      onChatHistory: (data) {
+        // joinRoom 이후 서버가 내려주는 이전 메시지 목록
+        final list = _parseMessageList(data);
+        if (_pendingHistoryCompleter != null &&
+            !_pendingHistoryCompleter!.isCompleted) {
+          _pendingHistoryCompleter!.complete(list);
+        }
+      },
+      onReceiveMessage: (data) {
+        final message = _parseSingleMessage(data);
+        if (message != null) {
+          _incomingMessageController.add(message);
+        }
+      },
+      onUserTyping: (data) {
+        // TODO: 타이핑 인디케이터가 필요하면 여기서 스트림/콜백 추가
+      },
+      onUserStopTyping: (data) {},
+    );
+    _isSocketConnected = true;
   }
 
-  /// 특정 채팅방의 메시지 목록 조회
-  /// TODO: GET $_baseUrl/chat-rooms/$roomId/messages 로 교체
+  /// 채팅방 목록 조회 (REST)
+  Future<List<ChatRoomModel>> fetchChatRooms({String keyword = ''}) async {
+    try {
+      final res = await ChatRoomService.getRooms(keyword: keyword);
+      // 실제 서버 응답을 콘솔에서 확인하기 위한 디버그 로그.
+      // 빈 배열이면 그냥 DB에 채팅방이 없는 것이고, 응답 자체가 에러/이상하면
+      // 여기서 확인 가능합니다.
+      debugPrint('🔍 [Chat] 채팅방 목록 응답: $res');
+      final list = (res['data'] is List) ? res['data'] as List : <dynamic>[];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(_parseRoom)
+          .toList();
+    } catch (e) {
+      debugPrint('🔍 [Chat] 채팅방 목록 조회 실패: $e');
+      return [];
+    }
+  }
+
+  ChatRoomModel _parseRoom(Map<String, dynamic> e) {
+    final opponent =
+        (e['opponent'] ?? e['partner'] ?? e['otherUser']) as Map<String, dynamic>?;
+
+    return ChatRoomModel(
+      id: '${e['id']}',
+      opponentId: '${opponent?['id'] ?? e['opponentId'] ?? ''}',
+      opponentName:
+          (opponent?['username'] ?? e['opponentName'] ?? 'User').toString(),
+      lastMessage: (e['lastMessage'] ?? '').toString(),
+      lastMessageAt:
+          DateTime.tryParse('${e['lastMessageAt'] ?? e['updatedAt'] ?? ''}') ??
+              DateTime.now(),
+      isOpponentOnline: e['isOpponentOnline'] == true,
+    );
+  }
+
+  /// 특정 채팅방의 메시지 목록 조회.
+  /// REST가 아니라, 소켓으로 방에 join하면 서버가 'chat_history'로 내려줌.
   Future<List<MessageModel>> fetchMessages(String roomId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
+    _ensureSocketConnected();
+    final id = int.tryParse(roomId) ?? 0;
+    _joinedRoomId = id;
 
-    final now = DateTime.now();
-    final raw = <Map<String, dynamic>>[
-      {'senderId': 'me', 'text': 'I want to buy it!', 'minutesAgo': 30},
-      {'senderId': 'oliver', 'text': 'Oh, I like it!', 'minutesAgo': 28},
-      {'senderId': 'oliver', 'text': 'How about around what time? Are you free?', 'minutesAgo': 27},
-      {'senderId': 'me', 'text': "I'm all fine", 'minutesAgo': 26},
-      {'senderId': 'me', 'text': 'I think Saturday morning is a good time', 'minutesAgo': 20},
-      {'senderId': 'me', 'text': "Sounds good! Then let's meet around 10 a.m. on Saturday.", 'minutesAgo': 19},
-      {'senderId': 'me', 'text': 'Where should we meet?', 'minutesAgo': 18},
-    ];
+    _pendingHistoryCompleter = Completer<List<MessageModel>>();
+    _socket.joinRoom(id);
 
-    return raw.map((m) {
-      final createdAt = now.subtract(Duration(minutes: m['minutesAgo'] as int));
-      return MessageModel(
-        id: '${roomId}_${m['minutesAgo']}',
-        chatRoomId: roomId,
-        senderId: m['senderId'] as String,
-        text: m['text'] as String,
-        createdAt: createdAt,
-        isMe: m['senderId'] == currentUserId,
-      );
-    }).toList();
+    // 서버 응답이 안 올 경우를 대비한 타임아웃
+    return _pendingHistoryCompleter!.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => <MessageModel>[],
+    );
   }
 
-  /// 메시지 전송
-  /// TODO: POST $_baseUrl/chat-rooms/$roomId/messages 로 교체
-  /// 실시간 수신은 WebSocket(web_socket_channel) 또는 Firebase 등으로 별도 스트림 구현 권장
+  List<MessageModel> _parseMessageList(dynamic data) {
+    final list = (data is List)
+        ? data
+        : ((data is Map && data['messages'] is List)
+            ? data['messages'] as List
+            : <dynamic>[]);
+    return list
+        .map(_parseSingleMessage)
+        .whereType<MessageModel>()
+        .toList();
+  }
+
+  MessageModel? _parseSingleMessage(dynamic e) {
+    if (e is! Map) return null;
+    final senderId = '${e['senderId'] ?? e['userId'] ?? ''}';
+    return MessageModel(
+      id: '${e['id'] ?? DateTime.now().millisecondsSinceEpoch}',
+      chatRoomId: '${e['roomId'] ?? _joinedRoomId ?? ''}',
+      senderId: senderId,
+      text: (e['message'] ?? e['text'] ?? '').toString(),
+      createdAt: DateTime.tryParse('${e['createdAt'] ?? ''}') ?? DateTime.now(),
+      isMe: senderId == currentUserId,
+    );
+  }
+
+  /// 메시지 전송 (소켓)
   Future<MessageModel> sendMessage({
     required String roomId,
     required String text,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 150));
+    _ensureSocketConnected();
+    final id = int.tryParse(roomId) ?? _joinedRoomId ?? 0;
+    _socket.sendMessage(id, text);
 
+    // 화면(chat_room_screen.dart)에서 이미 낙관적으로 표시하고 있으므로
+    // 여기서는 서버 ack을 기다리지 않고 바로 반환.
     return MessageModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       chatRoomId: roomId,
@@ -104,14 +163,20 @@ class ChatService {
   }
 
   /// 채팅방 나가기
-  /// TODO: DELETE $_baseUrl/chat-rooms/$roomId/leave 로 교체
+  /// TODO: api_service.dart에 "나가기" 전용 REST가 아직 없어서, 방이 생기면
+  /// 여기에 실제 엔드포인트를 연결하면 됩니다. 지금은 소켓 룸 상태만 정리.
   Future<void> leaveChatRoom(String roomId) async {
-    await Future.delayed(const Duration(milliseconds: 200));
+    if (_joinedRoomId == int.tryParse(roomId)) {
+      _joinedRoomId = null;
+    }
   }
 
   /// 알림 끄기 토글
-  /// TODO: PATCH $_baseUrl/chat-rooms/$roomId/notifications 로 교체
-  Future<void> toggleNotification(String roomId, bool mute) async {
-    await Future.delayed(const Duration(milliseconds: 200));
+  /// TODO: api_service.dart에 알림 on/off 전용 API가 아직 없어서 연결 대기 중.
+  Future<void> toggleNotification(String roomId, bool mute) async {}
+
+  void dispose() {
+    _socket.disconnect();
+    _isSocketConnected = false;
   }
 }

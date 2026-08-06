@@ -50,7 +50,7 @@ class _SignInPageState extends State<SignInPage> {
     final password = passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      _showError('이메일과 비밀번호를 입력해주세요.');
+      _showError('Enter your email and password.');
       return;
     }
 
@@ -60,7 +60,7 @@ class _SignInPageState extends State<SignInPage> {
 
       // AuthService.login은 statusCode 200 + token이 있을 때만 토큰을 저장함
       if (res['token'] == null) {
-        _showError(res['message']?.toString() ?? '이메일 또는 비밀번호를 확인해주세요.');
+        _showError(res['message']?.toString() ?? 'Please check your email or password.');
         return;
       }
 
@@ -73,7 +73,7 @@ class _SignInPageState extends State<SignInPage> {
         MaterialPageRoute(builder: (context) => const MainPage()),
       );
     } catch (e) {
-      _showError('네트워크 오류가 발생했어요: $e');
+      _showError('Network error occurred: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
