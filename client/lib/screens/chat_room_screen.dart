@@ -26,6 +26,15 @@ class ChatRoomScreen extends StatefulWidget {
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
 }
 
+/// 서버 응답을 기다리는 중인 낙관적(optimistic) 메시지 하나.
+/// receive_message로 내가 보낸 메시지가 돌아왔을 때, text로 매칭해서
+/// 화면에 미리 그려둔 임시 메시지를 실제 메시지로 교체하는 데 씁니다.
+class _PendingOptimistic {
+  final String tempId;
+  final String text;
+  _PendingOptimistic(this.tempId, this.text);
+}
+
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final ChatService _chatService = ChatService.instance;
   final TextEditingController _messageController = TextEditingController();
@@ -35,6 +44,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   bool _isLoading = true;
   bool _isSending = false;
 
+  final List<_PendingOptimistic> _pending = [];
+  StreamSubscription<MessageModel>? _messageSub;
+
   final GlobalKey _menuButtonKey = GlobalKey();
   OverlayEntry? _menuOverlay;
   StreamSubscription<MessageModel>? _incomingSub;
@@ -42,6 +54,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   @override
   void initState() {
     super.initState();
+    _listenIncomingMessages();
     _loadMessages();
     // 실시간으로 도착하는 메시지를 화면에 반영 (내가 보낸 건 이미 낙관적으로
     // 추가되어 있으므로 상대방이 보낸 것만 추가)
@@ -50,6 +63,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       if (message.chatRoomId != widget.roomId) return;
       if (message.isMe) return;
       setState(() => _messages.add(message));
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    });
+  }
+
+  /// 실시간 메시지 수신. 내가 보낸 메시지의 서버 확정본이 오면 낙관적 메시지를
+  /// 교체하고, 상대방이 보낸 메시지는 그대로 리스트에 추가합니다.
+  void _listenIncomingMessages() {
+    _messageSub = _chatService.messageStream.listen((msg) {
+      if (!mounted) return;
+      setState(() {
+        if (msg.isMe && _pending.isNotEmpty) {
+          final idx = _pending.indexWhere((p) => p.text == msg.text);
+          if (idx != -1) {
+            final pending = _pending.removeAt(idx);
+            final msgIdx = _messages.indexWhere((m) => m.id == pending.tempId);
+            if (msgIdx != -1) {
+              _messages[msgIdx] = msg;
+            } else {
+              _messages.add(msg);
+            }
+            return;
+          }
+        }
+        _messages.add(msg);
+      });
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     });
   }
@@ -80,21 +118,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     setState(() => _isSending = true);
     _messageController.clear();
 
-    // 낙관적 업데이트: 서버 응답 기다리지 않고 먼저 화면에 보여줌
+    // 낙관적 업데이트: 서버 응답 기다리지 않고 먼저 화면에 보여줌.
+    // 실제 서버 확정본은 _listenIncomingMessages()가 받아서 이 임시 메시지를 교체합니다.
+    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final optimisticMessage = MessageModel(
-      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      id: tempId,
       chatRoomId: widget.roomId,
       senderId: ChatService.currentUserId,
       text: text,
       createdAt: DateTime.now(),
       isMe: true,
     );
+    _pending.add(_PendingOptimistic(tempId, text));
     setState(() => _messages.add(optimisticMessage));
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
     try {
       await _chatService.sendMessage(roomId: widget.roomId, text: text);
-      // TODO: 실제 서버 응답의 message id로 optimisticMessage 교체
     } finally {
       if (mounted) setState(() => _isSending = false);
     }

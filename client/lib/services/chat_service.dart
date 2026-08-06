@@ -179,4 +179,38 @@ class ChatService {
     _socket.disconnect();
     _isSocketConnected = false;
   }
+
+  void dispose() {
+    _roomInfoController.close();
+    _historyController.close();
+    _messageController.close();
+    _typingController.close();
+    _stopTypingController.close();
+    _errorController.close();
+    disconnect();
+  }
+}
+
+/// 채팅 API 호출 실패 시 던지는 예외.
+/// 백엔드가 던지는 PRODUCT_NOT_FOUND, CANNOT_CHAT_WITH_SELF 같은 코드를 그대로 담아
+/// UI 단에서 code로 분기해 적절한 메시지를 보여줄 수 있게 합니다.
+class ChatServiceException implements Exception {
+  final String message;
+  final String code;
+  final int? statusCode;
+
+  ChatServiceException(this.message, {required this.code, this.statusCode});
+
+  @override
+  String toString() => 'ChatServiceException($code): $message';
+}
+
+/// 로그인 토큰/유저 정보 접근용 자리표시자.
+/// TODO: 프로젝트에 이미 있는 실제 인증 서비스로 교체하세요.
+class AuthService {
+  static final AuthService instance = AuthService._internal();
+  AuthService._internal();
+
+  String? token;
+  String? userId;
 }
