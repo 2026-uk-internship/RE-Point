@@ -1,7 +1,20 @@
 import 'package:flutter/material.dart';
-import '../theme/chat_theme.dart';
 import '../services/api_service.dart'; // ApiConfig, ProductService, ProductSocketService 등 import
 import 'chat_room_screen.dart';
+import '../services/chat_service.dart';
+
+// 이 화면 전용 색상 상수.
+// 배경 0A0B24 / 하단 고정 카드류 31324C / 하트·채팅 아이콘 흰색
+// 카테고리·시간 텍스트 CCCDED / 나머지 텍스트 흰색
+class _Design {
+  static const bg = Color(0xFF0A0B24);
+  static const card = Color(0xFF31324C);
+  static const iconWhite = Colors.white;
+  static const meta = Color(0xFFCCCDED); // 카테고리 / 시간
+  static const text = Colors.white;
+  static const danger = Color(0xFFE0577B);
+  static const textSecondary = Color(0xFFB9BACD);
+}
 
 class ItemDetailPage extends StatefulWidget {
   final int productId; // 조회할 상품 ID
@@ -14,12 +27,15 @@ class ItemDetailPage extends StatefulWidget {
 
 class _ItemDetailPageState extends State<ItemDetailPage> {
   final ProductSocketService _productSocket = ProductSocketService();
+  final PageController _imagePageController = PageController();
 
   bool _isLoading = true;
   Map<String, dynamic>? _productData;
   bool _isFavorite = false;
   int _likeCount = 0;
-  int _chatCount = 0; // 이 게시물로 시작된 채팅방 수 (하트 옆에 함께 표시)
+  int _chatCount = 0; // 이 게시물로 시작된 채팅방 수
+  int _currentImageIndex = 0;
+  bool _isStartingChat = false;
 
   @override
   void initState() {
@@ -74,18 +90,16 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
     });
 
     try {
-      // 💡 api_service.dart에 실제 존재하는 toggleFavorite 호출!
       final res = await ProductService.toggleFavorite(widget.productId);
+      debugPrint('🔍 [Favorite] 응답: $res'); // 실제 성공 판정 조건 확인용
 
       if (res['success'] != true && res['message'] == null) {
-        // 실패 시 원래대로 복구
         setState(() {
           _isFavorite = previousState;
           _likeCount += _isFavorite ? 1 : -1;
         });
       }
     } catch (e) {
-      // 에러 발생 시 원래대로 복구
       setState(() {
         _isFavorite = previousState;
         _likeCount += _isFavorite ? 1 : -1;
@@ -94,47 +108,82 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
     }
   }
 
-  // 4. 채팅 시작하기 API / 화면 이동
+  // 4. 채팅 시작하기: 서버에 방 생성/조회 요청 → 진짜 roomId로 이동
   Future<void> _startChat() async {
-    if (_productData == null) return;
+    if (_productData == null || _isStartingChat) return;
 
-    final sellerId =
-        _productData!['userId'] ?? _productData!['seller']?['id'] ?? 0;
     final sellerName =
         _productData!['userName'] ??
         _productData!['seller']?['username'] ??
         'Seller';
 
-    if (mounted) {
+    setState(() => _isStartingChat = true);
+
+    try {
+      final roomId = await ChatService.instance.createOrEnterRoom(
+        widget.productId.toString(),
+      );
+
+      if (!mounted) return;
+
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ChatRoomScreen(
-            roomId: 'room_${widget.productId}',
-            opponentName: sellerName,
-          ),
+          builder: (_) =>
+              ChatRoomScreen(roomId: roomId, opponentName: sellerName),
         ),
       );
+    } on ChatServiceException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (e) {
+      debugPrint('채팅방 생성/입장 실패: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('네트워크 오류로 채팅방을 열 수 없습니다.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isStartingChat = false);
     }
   }
 
   @override
   void dispose() {
     _productSocket.leaveProduct(widget.productId);
+    _imagePageController.dispose();
     super.dispose();
   }
+
+  // 이미지 목록 추출: 여러 장('images')이 오면 전부, 아니면 단일 'imgUrl' 하나.
+  List<String> get _imageUrls {
+    if (_productData?['images'] is List &&
+        (_productData!['images'] as List).isNotEmpty) {
+      return (_productData!['images'] as List)
+          .map((e) => e.toString())
+          .toList();
+    }
+    if (_productData?['imgUrl'] != null) {
+      return [_productData!['imgUrl'].toString()];
+    }
+    return [];
+  }
+
+  String _resolveImageUrl(String url) =>
+      url.startsWith('http') ? url : '${ApiConfig.baseUrl}/$url';
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: ChatColors.screenBackground(),
+      color: _Design.bg,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: _isLoading
             ? const Center(
-                child: CircularProgressIndicator(
-                  color: ChatColors.accentYellow,
-                ),
+                child: CircularProgressIndicator(color: Colors.white),
               )
             : _productData == null
             ? const Center(
@@ -143,84 +192,84 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
                   style: TextStyle(color: Colors.white),
                 ),
               )
-            : Stack(
-                children: [
-                  // 1. 스크롤 가능한 본문 영역
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 110),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeaderImage(context),
-                        const SizedBox(height: 16),
-                        _buildSellerProfile(),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                          child: Divider(color: Colors.white12, height: 1),
-                        ),
-                        _buildItemDetails(),
-                        const SizedBox(height: 30),
-                      ],
+            : SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 30),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeaderImage(context),
+                    const SizedBox(height: 16),
+                    _buildSellerProfile(),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      child: Divider(color: Colors.white12, height: 1),
                     ),
-                  ),
-
-                  // 2. 고정 하단 액션 바
-                  Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: 24,
-                    child: _buildFixedBottomBar(context),
-                  ),
-                ],
+                    _buildCategoryAndTimeRow(),
+                    const SizedBox(height: 12),
+                    _buildItemDetails(),
+                    const SizedBox(height: 20),
+                    _buildPriceChatCard(),
+                    const SizedBox(height: 30),
+                    _buildRelatedProductsSection(),
+                    const SizedBox(height: 30),
+                    _buildSellerItemsSection(),
+                  ],
+                ),
               ),
       ),
     );
   }
 
-  // ----- 이미지 상단 영역 -----
+  // ----- 이미지 상단 영역 (캐러셀 + 인디케이터 + 뒤로가기 + 찜 버튼) -----
   Widget _buildHeaderImage(BuildContext context) {
-    String? imageUrl;
-
-    if (_productData?['imgUrl'] != null) {
-      imageUrl = _productData!['imgUrl'].toString();
-    } else if (_productData?['images'] is List &&
-        (_productData!['images'] as List).isNotEmpty) {
-      imageUrl = _productData!['images'][0].toString();
-    }
+    final images = _imageUrls;
 
     return Stack(
       children: [
-        Container(
-          height: 320,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(24),
-              bottomRight: Radius.circular(24),
-            ),
+        ClipRRect(
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(24),
+            bottomRight: Radius.circular(24),
           ),
-          child: imageUrl != null && imageUrl.isNotEmpty
-              ? Image.network(
-                  imageUrl.startsWith('http')
-                      ? imageUrl
-                      : '${ApiConfig.baseUrl}/$imageUrl',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.broken_image,
-                    size: 60,
-                    color: Colors.white24,
+          child: SizedBox(
+            height: 320,
+            width: double.infinity,
+            child: images.isEmpty
+                ? Container(
+                    color: Colors.white.withOpacity(0.08),
+                    child: const Icon(
+                      Icons.image_outlined,
+                      size: 80,
+                      color: Colors.white24,
+                    ),
+                  )
+                : PageView.builder(
+                    controller: _imagePageController,
+                    itemCount: images.length,
+                    onPageChanged: (index) =>
+                        setState(() => _currentImageIndex = index),
+                    itemBuilder: (context, index) {
+                      return Container(
+                        color: Colors.white.withOpacity(0.08),
+                        child: Image.network(
+                          _resolveImageUrl(images[index]),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.broken_image,
+                            size: 60,
+                            color: Colors.white24,
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                )
-              : const Icon(
-                  Icons.image_outlined,
-                  size: 80,
-                  color: Colors.white24,
-                ),
+          ),
         ),
+
+        // 뒤로가기 버튼
         Positioned(
           top: MediaQuery.of(context).padding.top + 10,
           left: 16,
@@ -236,6 +285,49 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
             ),
           ),
         ),
+
+        // 찜(하트) 토글 버튼
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 10,
+          right: 16,
+          child: CircleAvatar(
+            backgroundColor: Colors.black38,
+            child: IconButton(
+              icon: Icon(
+                _isFavorite
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+                color: _isFavorite ? _Design.danger : Colors.white,
+                size: 20,
+              ),
+              onPressed: _toggleLike,
+            ),
+          ),
+        ),
+
+        // 이미지 여러 장일 때 하단 점 인디케이터
+        if (images.length > 1)
+          Positioned(
+            bottom: 14,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(images.length, (index) {
+                final isActive = index == _currentImageIndex;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: isActive ? 16 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: isActive ? Colors.white : Colors.white38,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
+          ),
       ],
     );
   }
@@ -245,8 +337,12 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
     final sellerName =
         _productData?['userName'] ??
         _productData?['seller']?['username'] ??
-        'Oliver';
-    final location = _productData?['location'] ?? 'London';
+        'Unknown';
+    final location = _productData?['location'] ?? '';
+    // TODO: 실제 판매자 프로필 이미지 필드명 확인 후 교체
+    final avatarUrl =
+        _productData?['seller']?['img'] ??
+        _productData?['seller']?['profileImage'];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -255,15 +351,21 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
           CircleAvatar(
             radius: 22,
             backgroundColor: Colors.white.withOpacity(0.15),
-            child: Text(
-              sellerName.toString().isNotEmpty
-                  ? sellerName.toString()[0].toUpperCase()
-                  : 'U',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            backgroundImage:
+                (avatarUrl != null && avatarUrl.toString().isNotEmpty)
+                ? NetworkImage(_resolveImageUrl(avatarUrl.toString()))
+                : null,
+            child: (avatarUrl == null || avatarUrl.toString().isEmpty)
+                ? Text(
+                    sellerName.toString().isNotEmpty
+                        ? sellerName.toString()[0].toUpperCase()
+                        : 'U',
+                    style: const TextStyle(
+                      color: _Design.text,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -273,7 +375,7 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
                 Text(
                   sellerName.toString(),
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: _Design.text,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -282,7 +384,7 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
                 Text(
                   location.toString(),
                   style: const TextStyle(
-                    color: ChatColors.textSecondary,
+                    color: _Design.textSecondary,
                     fontSize: 12,
                   ),
                 ),
@@ -295,17 +397,17 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
     );
   }
 
-  // 별점 대신 표시하는 하트(찜) 수 + 채팅 수
+  // 하트(찜) 수 + 채팅 수 (읽기 전용 통계)
   Widget _buildHeartChatCounts() {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.favorite_rounded, color: ChatColors.danger, size: 16),
+        const Icon(Icons.favorite_rounded, color: _Design.danger, size: 16),
         const SizedBox(width: 4),
         Text(
           '$_likeCount',
           style: const TextStyle(
-            color: Colors.white,
+            color: _Design.text,
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -313,14 +415,14 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
         const SizedBox(width: 10),
         const Icon(
           Icons.chat_bubble_rounded,
-          color: ChatColors.textSecondary,
+          color: _Design.textSecondary,
           size: 15,
         ),
         const SizedBox(width: 4),
         Text(
           '$_chatCount',
           style: const TextStyle(
-            color: Colors.white,
+            color: _Design.text,
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -329,14 +431,45 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
     );
   }
 
-  // ----- 게시글 내용 -----
+  // ----- 카테고리 태그 + 작성 시각 (한 줄) -----
+  Widget _buildCategoryAndTimeRow() {
+    // TODO: 실제 카테고리 필드명 확정되면 교체
+    final category =
+        _productData?['category']?.toString() ??
+        _productData?['categoryName']?.toString();
+    final timeAgo = _productData?['createdAt']?.toString() ?? '방금 전';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          if (category != null && category.isNotEmpty) ...[
+            const Icon(Icons.eco_rounded, size: 15, color: _Design.meta),
+            const SizedBox(width: 6),
+            Text(
+              category,
+              style: const TextStyle(color: _Design.meta, fontSize: 13),
+            ),
+          ],
+          const Spacer(),
+          Text(
+            timeAgo,
+            style: const TextStyle(color: _Design.meta, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ----- 게시글 내용 (제목 + 설명) -----
   Widget _buildItemDetails() {
     final title = _productData?['title']?.toString() ?? '제목 없음';
+    // TODO: 실제 설명 필드명(content/description/contents 등) 확정되면 정리
     final description =
         _productData?['content']?.toString() ??
         _productData?['description']?.toString() ??
+        _productData?['contents']?.toString() ??
         '';
-    final timeAgo = _productData?['createdAt']?.toString() ?? '방금 전';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -346,110 +479,179 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
           Text(
             title,
             style: const TextStyle(
-              color: Colors.white,
+              color: _Design.text,
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            timeAgo,
-            style: const TextStyle(
-              color: ChatColors.textSecondary,
-              fontSize: 13,
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              description,
+              style: const TextStyle(
+                color: _Design.text,
+                fontSize: 15,
+                height: 1.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            description,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 15,
-              height: 1.5,
-            ),
-          ),
+          ],
         ],
       ),
     );
   }
 
-  // ----- 고정 하단 바 -----
-  Widget _buildFixedBottomBar(BuildContext context) {
+  // ----- 가격 + 채팅 카드 (스크롤 콘텐츠 안, 플로팅 아님) -----
+  Widget _buildPriceChatCard() {
     final price = _productData?['price']?.toString() ?? '0';
 
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: ChatColors.cardBackground,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: Icon(
-              _isFavorite
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_border_rounded,
-              color: _isFavorite ? ChatColors.danger : Colors.white70,
-              size: 24,
-            ),
-            onPressed: _toggleLike,
-          ),
-          const VerticalDivider(
-            color: Colors.white24,
-            indent: 16,
-            endIndent: 16,
-            width: 16,
-          ),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Price',
-                  style: TextStyle(
-                    color: ChatColors.textSecondary,
-                    fontSize: 11,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          color: _Design.card,
+          borderRadius: BorderRadius.circular(32),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Price',
+                    style: TextStyle(color: _Design.text, fontSize: 11),
                   ),
-                ),
-                Text(
-                  '£ $price',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
+                  Text(
+                    '£ $price',
+                    style: const TextStyle(
+                      color: _Design.text,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ChatColors.accentYellow,
-              foregroundColor: const Color(0xFF241A3D),
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                ],
               ),
             ),
-            onPressed: _startChat,
-            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-            label: const Text(
-              'Chatting',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: _Design.bg,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+              onPressed: _isStartingChat ? null : _startChat,
+              icon: _isStartingChat
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+              label: const Text(
+                'Chatting',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ----- 연관 상품 섹션 (자리만, 데이터 연동은 다음 단계) -----
+  Widget _buildRelatedProductsSection() {
+    // TODO: ProductService.getRelatedByCategory(widget.productId) 연동 필요
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Text(
+                'Related products',
+                style: TextStyle(
+                  color: _Design.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: _Design.textSecondary),
+            ],
           ),
-        ],
+        ),
+        const SizedBox(height: 12),
+        _buildPlaceholderCardRow(),
+      ],
+    );
+  }
+
+  // ----- 판매자의 다른 상품 섹션 (자리만, 데이터 연동은 다음 단계) -----
+  Widget _buildSellerItemsSection() {
+    // TODO: 판매자 다른 상품 조회 API 연동 필요
+    final sellerName =
+        _productData?['userName'] ?? _productData?['seller']?['username'] ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "$sellerName's items for sale",
+                style: const TextStyle(
+                  color: _Design.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: _Design.textSecondary,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildPlaceholderCardRow(),
+      ],
+    );
+  }
+
+  Widget _buildPlaceholderCardRow() {
+    return SizedBox(
+      height: 130,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: 3,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (_, __) => Container(
+          width: 110,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Center(
+            child: Icon(Icons.image_outlined, color: Colors.white24, size: 32),
+          ),
+        ),
       ),
     );
   }

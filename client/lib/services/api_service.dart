@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'current_user.dart';
 
 // ------------------------------------------------------
 // 0. 공통 API 설정 및 토큰 관리
@@ -58,6 +59,16 @@ class AuthService {
     final data = jsonDecode(res.body);
     if (res.statusCode == 200 && data['token'] != null) {
       ApiConfig.setToken(data['token']);
+
+      // 로그인 응답의 data.id를 바로 CurrentUser에 채워둠.
+      // /users/me가 id를 내려주지 않아서, 여기서 채워두지 않으면
+      // CurrentUser.id가 계속 null로 남아 채팅 isMe 판별이 깨짐.
+      final userData = data['data'];
+      if (userData is Map && userData['id'] != null) {
+        CurrentUser.id = userData['id'] is int
+            ? userData['id'] as int
+            : int.tryParse('${userData['id']}');
+      }
     }
     return data;
   }
