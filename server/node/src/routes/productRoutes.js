@@ -67,5 +67,6 @@ router.get(
 ); // GET /products/me/favorites/auctions
 
 router.post("/:id/bid", verifyToken, bidController.placeBid); // POST /products/:id/bid
+router.patch("/:id/complete", verifyToken, productController.completeTrade);
 
 module.exports = router;

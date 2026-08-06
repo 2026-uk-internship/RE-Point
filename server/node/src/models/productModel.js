@@ -685,3 +685,177 @@ exports.getAuctionDetail = async (productId) => {
     })),
   };
 };
+
+// 가격이 없는(Free) 카테고리에 지급할 고정 리워드.
+// category.point_rate × price 로는 0이 나오기 때문에 별도 처리.
+// ⚠️ 임의로 넣은 값입니다 — 정책에 맞게 조정해주세요.
+const FREE_ITEM_REWARD = 5;
+
+// 거래 금액과 카테고리의 point_rate(DB 값)를 받아 리워드 포인트를 계산.
+function calculateRewardPoints(pointRate, price) {
+  if (price === 0 || price == null || pointRate == null) {
+    return FREE_ITEM_REWARD;
+  }
+  return Math.round(price * Number(pointRate));
+}
+
+// 거래 완료 처리
+// - trades 테이블에 완료 레코드 생성/갱신
+// - products.status를 'sale'/'reserved' -> 'sold'로 안전하게 전이
+// - point/auction 타입: 대금을 구매자 -> 판매자로 이체하고 point_history에 기록
+//   (구매자: 'spend_purchase' 또는 'auction_win', 판매자: 'earn_sale')
+// - 모든 타입: 판매자/구매자 모두에게 카테고리 point_rate 기준 리워드 포인트를
+//   users.point에 직접 반영. point_history.type ENUM에 리워드 전용 값이 없어서
+//   point_history에는 기록하지 않음 (필요해지면 ENUM 확장 후 다시 추가)
+exports.completeTrade = async (productId, sellerId, buyerId) => {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // FOR UPDATE로 동시에 여러 요청이 같은 상품을 완료 처리하지 못하도록 잠금
+    const [[product]] = await connection.query(
+      `SELECT p.id, p.user_id, p.type, p.money_price, p.point_price, p.status,
+              c.point_rate
+       FROM products p
+       LEFT JOIN category c ON c.id = p.category_id
+       WHERE p.id = ? FOR UPDATE`,
+      [productId],
+    );
+
+    if (!product) {
+      throw new Error("PRODUCT_NOT_FOUND");
+    }
+    if (product.user_id !== sellerId) {
+      throw new Error("NOT_OWNER");
+    }
+    if (product.status === "sold") {
+      throw new Error("ALREADY_COMPLETED");
+    }
+
+    let resolvedBuyerId = buyerId;
+    let price = null; // 실제 대금 이체용 (point/auction 타입만 해당)
+    let rewardBasisPrice = null;
+    let buyerHistoryType = null; // point_history.type — 구매자 기록용
+
+    if (product.type === "auction") {
+      const [[auction]] = await connection.query(
+        `SELECT highest_user, highest_point FROM auction WHERE product_id = ? FOR UPDATE`,
+        [productId],
+      );
+      if (!auction || !auction.highest_user) {
+        throw new Error("NO_BIDDER");
+      }
+      resolvedBuyerId = auction.highest_user;
+      price = auction.highest_point;
+      rewardBasisPrice = auction.highest_point;
+      buyerHistoryType = "auction_win";
+    } else if (product.type === "point") {
+      price = product.point_price;
+      rewardBasisPrice = product.point_price;
+      buyerHistoryType = "spend_purchase";
+    } else {
+      // general (현금 거래) — 실제 포인트 이체는 없지만 리워드는 money_price 기준으로 계산
+      rewardBasisPrice = product.money_price;
+    }
+
+    if (!resolvedBuyerId) {
+      throw new Error("BUYER_REQUIRED");
+    }
+    if (resolvedBuyerId === sellerId) {
+      throw new Error("CANNOT_TRADE_WITH_SELF");
+    }
+
+    // 상태 전이 (동시성 대비 재확인)
+    const [updateResult] = await connection.query(
+      `UPDATE products SET status = 'sold' WHERE id = ? AND status != 'sold'`,
+      [productId],
+    );
+    if (updateResult.affectedRows === 0) {
+      throw new Error("ALREADY_COMPLETED");
+    }
+
+    // trades 테이블에 완료 레코드 upsert.
+    // 이미 이 상품+구매자 조합의 요청(requested/accepted) 레코드가 있으면 completed로 갱신,
+    // 없으면(판매자가 요청 단계 없이 바로 완료 처리한 경우) 새로 insert.
+    const [[existingTrade]] = await connection.query(
+      `SELECT id FROM trades
+       WHERE product_id = ? AND buyer_id = ? AND status IN ('requested', 'accepted')
+       ORDER BY requested_at DESC LIMIT 1 FOR UPDATE`,
+      [productId, resolvedBuyerId],
+    );
+
+    if (existingTrade) {
+      await connection.query(
+        `UPDATE trades SET status = 'completed', completed_at = NOW() WHERE id = ?`,
+        [existingTrade.id],
+      );
+    } else {
+      await connection.query(
+        `INSERT INTO trades (product_id, buyer_id, seller_id, status, completed_at)
+         VALUES (?, ?, ?, 'completed', NOW())`,
+        [productId, resolvedBuyerId, sellerId],
+      );
+    }
+
+    // 실제 대금 이체 (포인트 거래 / 경매만 해당 — 일반 현금 거래는 제외)
+    if (price != null) {
+      const [[buyerRow]] = await connection.query(
+        `SELECT point FROM users WHERE id = ? FOR UPDATE`,
+        [resolvedBuyerId],
+      );
+      if (!buyerRow || buyerRow.point < price) {
+        throw new Error("INSUFFICIENT_POINTS");
+      }
+
+      await connection.query(
+        `UPDATE users SET point = point - ? WHERE id = ?`,
+        [price, resolvedBuyerId],
+      );
+      await connection.query(
+        `UPDATE users SET point = point + ? WHERE id = ?`,
+        [price, sellerId],
+      );
+
+      // point_history 기록 (기존 ENUM 값 그대로 사용)
+      await connection.query(
+        `INSERT INTO point_history (user_id, amount, type, related_id)
+         VALUES (?, ?, ?, ?)`,
+        [resolvedBuyerId, -price, buyerHistoryType, productId],
+      );
+      await connection.query(
+        `INSERT INTO point_history (user_id, amount, type, related_id)
+         VALUES (?, ?, 'earn_sale', ?)`,
+        [sellerId, price, productId],
+      );
+    }
+
+    // 거래 완료 리워드 포인트 (카테고리 point_rate 적용, 양쪽 모두 지급)
+    // point_history에는 기록하지 않음 — 적합한 type ENUM 값이 없어서 users.point만 갱신
+    const rewardPoints = calculateRewardPoints(
+      product.point_rate,
+      rewardBasisPrice,
+    );
+
+    await connection.query(
+      `UPDATE users SET point = point + ? WHERE id IN (?, ?)`,
+      [rewardPoints, sellerId, resolvedBuyerId],
+    );
+
+    await connection.commit();
+
+    return {
+      productId: Number(productId),
+      sellerId,
+      buyerId: resolvedBuyerId,
+      price,
+      rewardPoints,
+      status: "sold",
+    };
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+};

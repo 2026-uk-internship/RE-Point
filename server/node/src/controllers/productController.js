@@ -152,11 +152,6 @@ exports.getProductDetail = async (req, res) => {
   }
 };
 
-// TODO: 경매 세부 페이지 디자인 확정 후 구현
-// exports.getAuctionDetail = async (req, res) => {
-//   ...
-// };
-
 exports.getRelatedByCategory = async (req, res) => {
   try {
     const { id } = req.params;
@@ -349,5 +344,44 @@ exports.getAuctionDetail = async (req, res) => {
     return res
       .status(500)
       .json({ message: "An internal server error occurred." });
+  }
+};
+
+// 거래 완료 처리 (판매자만 호출 가능)
+// PATCH /products/:id/complete
+// body: { buyerId } — general/point 타입일 때 필요. auction은 최고 입찰자로 자동 지정되므로 무시됨.
+exports.completeTrade = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sellerId = req.user.id;
+    const { buyerId } = req.body;
+
+    const result = await productModel.completeTrade(id, sellerId, buyerId);
+
+    return res.status(200).json({
+      message: "Trade completed successfully.",
+      data: result,
+    });
+  } catch (err) {
+    console.error(err);
+
+    const errorMap = {
+      PRODUCT_NOT_FOUND: [404, "Product not found."],
+      NOT_OWNER: [403, "Only the seller can complete this trade."],
+      ALREADY_COMPLETED: [409, "This product has already been sold."],
+      NO_BIDDER: [400, "This auction has no bidder."],
+      BUYER_REQUIRED: [400, "buyerId is required for this product type."],
+      CANNOT_TRADE_WITH_SELF: [
+        400,
+        "Seller and buyer cannot be the same user.",
+      ],
+      INSUFFICIENT_POINTS: [400, "Buyer does not have enough points."],
+    };
+
+    const [status, message] = errorMap[err.message] || [
+      500,
+      "An internal server error occurred.",
+    ];
+    return res.status(status).json({ message });
   }
 };
