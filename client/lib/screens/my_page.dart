@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../theme/chat_theme.dart';
 import '../services/api_service.dart';
 import '../services/current_user.dart';
@@ -23,6 +24,11 @@ class _MyPageState extends State<MyPage> {
 
   bool _isLoading = true;
 
+  // 프로필 사진
+  String? _profileImageUrl;
+  bool _isUploadingPhoto = false;
+  final ImagePicker _imagePicker = ImagePicker();
+
   @override
   void initState() {
     super.initState();
@@ -32,6 +38,7 @@ class _MyPageState extends State<MyPage> {
   Future<void> _loadProfile() async {
     setState(() => _isLoading = true);
     await CurrentUser.refresh();
+    await _refreshProfileImage();
     if (!mounted) return;
     setState(() {
       userName = CurrentUser.username ?? userName;
@@ -39,6 +46,122 @@ class _MyPageState extends State<MyPage> {
       rePoints = CurrentUser.points ?? rePoints;
       _isLoading = false;
     });
+  }
+
+  // CurrentUser에 프로필 이미지 필드가 없을 수도 있어서, 여기서는 프로필 응답을
+  // 직접 조회해서 이미지 URL만 뽑아옵니다.
+  // TODO: 백엔드가 실제로 내려주는 이미지 URL 필드명이 다르면 아래 키 목록만 맞춰주세요.
+  Future<void> _refreshProfileImage() async {
+    try {
+      final res = await ProfileService.getMyProfile();
+      final data = (res['data'] ?? res) as Map<String, dynamic>?;
+      final imageUrl =
+          data?['profileImage'] ?? data?['profileImageUrl'] ?? data?['image'];
+      if (imageUrl != null && imageUrl.toString().isNotEmpty && mounted) {
+        setState(() => _profileImageUrl = imageUrl.toString());
+      }
+    } catch (_) {
+      // 이미지 조회 실패해도 나머지 프로필 정보 표시는 그대로 진행
+    }
+  }
+
+  void _showPhotoSourceSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ChatColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14),
+                child: Text(
+                  'Update profile photo',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.photo_library_outlined,
+                  color: Colors.white70,
+                ),
+                title: const Text(
+                  'Choose from Gallery',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _pickAndUploadPhoto(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: Colors.white70,
+                ),
+                title: const Text(
+                  'Take Photo',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _pickAndUploadPhoto(ImageSource.camera);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    if (_isUploadingPhoto) return;
+
+    final XFile? picked = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1080,
+    );
+    if (picked == null) return;
+
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final res = await ProfileService.updateProfileImage(picked.path);
+      final data = (res['data'] ?? res) as Map<String, dynamic>?;
+      final imageUrl =
+          data?['profileImage'] ?? data?['profileImageUrl'] ?? data?['image'];
+
+      if (imageUrl != null && imageUrl.toString().isNotEmpty) {
+        setState(() => _profileImageUrl = imageUrl.toString());
+      } else {
+        // 응답에 URL이 안 왔으면 프로필을 다시 조회해서 갱신
+        await _refreshProfileImage();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('프로필 사진이 변경됐어요.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('프로필 사진 업로드에 실패했어요: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
   }
 
   Future<void> _handleSignOut() async {
@@ -121,28 +244,51 @@ class _MyPageState extends State<MyPage> {
             CircleAvatar(
               radius: 42,
               backgroundColor: Colors.white.withOpacity(0.15),
-              child: const Text(
-                'O',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
+              backgroundImage: _profileImageUrl != null
+                  ? NetworkImage(_profileImageUrl!)
+                  : null,
+              child: _profileImageUrl == null
+                  ? Text(
+                      userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
+            ),
+            if (_isUploadingPhoto)
+              const Positioned.fill(
+                child: CircleAvatar(
+                  radius: 42,
+                  backgroundColor: Colors.black45,
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
-            ),
             Positioned(
               right: 0,
               bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(
-                  color: ChatColors.accentYellow,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.camera_alt_rounded,
-                  size: 14,
-                  color: Color(0xFF241A3D),
+              child: GestureDetector(
+                onTap: _isUploadingPhoto ? null : _showPhotoSourceSheet,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: ChatColors.accentYellow,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    size: 14,
+                    color: Color(0xFF241A3D),
+                  ),
                 ),
               ),
             ),
