@@ -35,6 +35,8 @@ To run the Flutter app, navigate into the `client` folder and run:
 cd client
 flutter run
 ```
+
+**Since the school network blocks the emulator's DNS and ports, you need to run Flutter with Run on your own phone or access it via the web.**
  
 ---
 
