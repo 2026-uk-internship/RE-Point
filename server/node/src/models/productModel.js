@@ -96,7 +96,11 @@ const SORT_MAP = {
 const getSortClause = (sort) => SORT_MAP[sort] || SORT_MAP.newest; // 기본값: 최신순
 
 // 일반거래 목록
-exports.getGeneralList = async (sort) => {
+exports.getGeneralList = async (sort, location) => {
+  const params = [];
+  const locationClause = location ? "AND p.location = ?" : "";
+  if (location) params.push(location);
+
   const [rows] = await pool.query(
     `SELECT
        p.id, p.title, p.money_price AS price, p.location,
@@ -104,14 +108,20 @@ exports.getGeneralList = async (sort) => {
      FROM products p
      LEFT JOIN favorites f ON f.product_id = p.id
      WHERE p.type = 'general' AND p.status = 'sale'
+       ${locationClause}
      GROUP BY p.id
      ORDER BY ${getSortClause(sort)}`,
+    params,
   );
   return rows;
 };
 
 // 포인트거래 목록
-exports.getPointList = async (sort) => {
+exports.getPointList = async (sort, location) => {
+  const params = [];
+  const locationClause = location ? "AND p.location = ?" : "";
+  if (location) params.push(location);
+
   const [rows] = await pool.query(
     `SELECT
        p.id, p.title, p.point_price AS price, p.location,
@@ -119,14 +129,20 @@ exports.getPointList = async (sort) => {
      FROM products p
      LEFT JOIN favorites f ON f.product_id = p.id
      WHERE p.type = 'point' AND p.status = 'sale'
+       ${locationClause}
      GROUP BY p.id
      ORDER BY ${getSortClause(sort)}`,
+    params,
   );
   return rows;
 };
 
 // 경매 목록
-exports.getAuctionList = async (sort) => {
+exports.getAuctionList = async (sort, location) => {
+  const params = [];
+  const locationClause = location ? "AND p.location = ?" : "";
+  if (location) params.push(location);
+
   const [rows] = await pool.query(
     `SELECT
        p.id, p.title, a.end_date, a.highest_point,
@@ -134,16 +150,17 @@ exports.getAuctionList = async (sort) => {
      FROM auction a
      JOIN products p ON p.id = a.product_id
      LEFT JOIN favorites f ON f.product_id = p.id
+     WHERE 1=1
+       ${locationClause}
      GROUP BY p.id
      ORDER BY ${getSortClause(sort)}`,
+    params,
   );
 
   const now = new Date();
-
   return rows.map((row) => {
     const diffMs = new Date(row.end_date) - now;
     const isOngoing = diffMs > 0;
-
     let remaining = "00:00";
     if (isOngoing) {
       const totalMinutes = Math.floor(diffMs / 60000);
@@ -151,7 +168,6 @@ exports.getAuctionList = async (sort) => {
       const minutes = String(totalMinutes % 60).padStart(2, "0");
       remaining = `${hours}:${minutes}`;
     }
-
     return {
       id: row.id,
       title: row.title,

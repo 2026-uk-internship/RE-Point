@@ -118,10 +118,18 @@ class ProductService {
   static Future<Map<String, dynamic>> getProductList(
     String type, {
     String sort = 'newest',
+    String? location, // 선택값. null/빈 문자열이면 전체 조회 (기존과 동일)
   }) async {
-    final res = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}/products/$type?sort=$sort'),
-    );
+    final query = <String, String>{'sort': sort};
+    if (location != null && location.trim().isNotEmpty) {
+      query['location'] = location.trim();
+    }
+
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}/products/$type',
+    ).replace(queryParameters: query);
+
+    final res = await http.get(uri);
     return jsonDecode(res.body);
   }
 
