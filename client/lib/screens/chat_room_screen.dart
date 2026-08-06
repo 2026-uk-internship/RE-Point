@@ -41,6 +41,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   List<MessageModel> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
+  bool _hasLoadError = false; // 메시지 조회 실패 시 재시도 UI를 보여주기 위한 플래그
 
   final List<_PendingOptimistic> _pending = [];
   StreamSubscription<MessageModel>? _messageSub;
@@ -80,14 +81,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     });
   }
 
+  /// 메시지 목록 조회. 실패(타임아웃/네트워크 오류 등) 시에도
+  /// _isLoading이 반드시 해제되도록 try/catch/finally로 감쌈.
   Future<void> _loadMessages() async {
-    setState(() => _isLoading = true);
-    final messages = await _chatService.fetchMessages(widget.roomId);
     setState(() {
-      _messages = messages;
-      _isLoading = false;
+      _isLoading = true;
+      _hasLoadError = false;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
+    try {
+      final messages = await _chatService.fetchMessages(widget.roomId);
+      if (!mounted) return;
+      setState(() {
+        _messages = messages;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    } catch (e) {
+      debugPrint('메시지 조회 실패: $e');
+      if (mounted) {
+        setState(() => _hasLoadError = true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -247,6 +265,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     ? const Center(
                         child: CircularProgressIndicator(color: Colors.white),
                       )
+                    : _hasLoadError
+                    ? _buildLoadErrorView()
                     : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.symmetric(
@@ -262,6 +282,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// 메시지 조회 실패 시 보여주는 재시도 화면.
+  Widget _buildLoadErrorView() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.wifi_off_rounded,
+            color: ChatColors.textSecondary,
+            size: 36,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '메시지를 불러오지 못했습니다.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 12),
+          TextButton(onPressed: _loadMessages, child: const Text('다시 시도')),
+        ],
       ),
     );
   }
