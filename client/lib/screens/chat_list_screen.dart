@@ -44,7 +44,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
   void _onSearchChanged(String query) {
     setState(() {
       _filteredRooms = _allRooms
-          .where((r) => r.opponentName.toLowerCase().contains(query.toLowerCase()))
+          .where(
+            (r) => r.opponentName.toLowerCase().contains(query.toLowerCase()),
+          )
           .toList();
     });
   }
@@ -66,7 +68,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
             _buildSearchBar(),
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    )
                   : RefreshIndicator(
                       onRefresh: _loadRooms,
                       child: _filteredRooms.isEmpty
@@ -76,16 +80,22 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                 Center(
                                   child: Text(
                                     'No conversations yet',
-                                    style: TextStyle(color: ChatColors.textSecondary),
+                                    style: TextStyle(
+                                      color: ChatColors.textSecondary,
+                                    ),
                                   ),
                                 ),
                               ],
                             )
                           : ListView.separated(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
                               itemCount: _filteredRooms.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 4),
-                              itemBuilder: (context, index) => _buildRoomTile(_filteredRooms[index]),
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 4),
+                              itemBuilder: (context, index) =>
+                                  _buildRoomTile(_filteredRooms[index]),
                             ),
                     ),
             ),
@@ -169,7 +179,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       room.lastMessage,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: ChatColors.textSecondary, fontSize: 13),
+                      style: const TextStyle(
+                        color: ChatColors.textSecondary,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -179,12 +192,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 children: [
                   Text(
                     room.relativeTime,
-                    style: const TextStyle(color: ChatColors.textSecondary, fontSize: 11),
+                    style: const TextStyle(
+                      color: ChatColors.textSecondary,
+                      fontSize: 11,
+                    ),
                   ),
                   if (room.unreadCount > 0) ...[
                     const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: ChatColors.accentYellow,
                         borderRadius: BorderRadius.circular(10),
@@ -214,8 +233,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
         CircleAvatar(
           radius: 24,
           backgroundColor: Colors.white.withOpacity(0.1),
-          backgroundImage:
-              room.opponentAvatarUrl != null ? NetworkImage(room.opponentAvatarUrl!) : null,
+          backgroundImage: room.opponentAvatarUrl != null
+              ? NetworkImage(room.opponentAvatarUrl!)
+              : null,
           child: room.opponentAvatarUrl == null
               ? Text(
                   room.opponentName.isNotEmpty ? room.opponentName[0] : '?',
@@ -233,7 +253,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
               decoration: BoxDecoration(
                 color: ChatColors.onlineDot,
                 shape: BoxShape.circle,
-                border: Border.all(color: ChatColors.topBarBackground, width: 2),
+                border: Border.all(
+                  color: ChatColors.topBarBackground,
+                  width: 2,
+                ),
               ),
             ),
           ),
