@@ -4,6 +4,7 @@ import 'alarm_page.dart';
 import 'list_for_auction_page.dart';
 import 'post_auction_page.dart';
 import 'item_detail_page.dart';
+import 'auction_detail_page.dart';
 import '../services/api_service.dart';
 import '../services/current_user.dart';
 
@@ -268,6 +269,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // 경매 상품 카드를 탭하면 경매 전용 상세 페이지로 이동
+  void _navigateToAuctionDetail(int auctionId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AuctionDetailPage(auctionId: auctionId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // CustomBottomNav의 실제 배치 방식(bottomInset + 12 여백 + 64 높이)과
@@ -423,7 +434,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _auctionCard(_AuctionItem item) {
     return GestureDetector(
-      onTap: item.id >= 0 ? () => _navigateToDetail(item.id) : null,
+      onTap: item.id >= 0 ? () => _navigateToAuctionDetail(item.id) : null,
       child: SizedBox(
         width: 110,
         child: Column(
