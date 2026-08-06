@@ -9,6 +9,7 @@ import 'chat_room_screen.dart';
 import 'schedule_page.dart';
 import 'chat_search_page.dart';
 import 'report_listing_dialog.dart';
+import '../services/api_service.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
@@ -190,16 +191,60 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _closeMenu();
     switch (option) {
       case ChatMenuOption.schedule:
-        // TODO: 일정 관리 화면으로 이동
+        final picked = await Navigator.push<DateTime>(
+          context,
+          MaterialPageRoute(builder: (_) => const SchedulePage()),
+        );
+        if (picked != null) {
+          // TODO: api_service.dart에 일정 등록 엔드포인트가 추가되면 여기서 호출
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Pickup scheduled for ${picked.month}/${picked.day}')),
+            );
+          }
+        }
         break;
       case ChatMenuOption.search:
-        // TODO: 채팅 내 검색 UI 열기
+        final selected = await Navigator.push<MessageModel>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatSearchPage(
+              roomId: widget.roomId,
+              opponentName: widget.opponentName,
+              opponentAvatarUrl: widget.opponentAvatarUrl,
+            ),
+          ),
+        );
+        if (selected != null) {
+          // TODO: 선택한 메시지(selected) 위치로 스크롤하고 싶으면 여기서 처리
+          debugPrint('검색에서 선택한 메시지: ${selected.id}');
+        }
         break;
       case ChatMenuOption.mute:
         await _chatService.toggleNotification(widget.roomId, true);
         break;
       case ChatMenuOption.report:
-        // TODO: 신고 화면/다이얼로그 열기
+        final reasons = await showReportListingDialog(context);
+        if (reasons != null && reasons.isNotEmpty) {
+          try {
+            await ReportService.createReport(
+              type: 'chat',
+              contents: reasons.join(', '),
+              relatedId: int.tryParse(widget.roomId) ?? 0,
+            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Report submitted.')),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to submit report: $e')),
+              );
+            }
+          }
+        }
         break;
       case ChatMenuOption.leave:
         await _showLeaveConfirmDialog();
@@ -443,43 +488,65 @@ class _ChatOptionsMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
+
       child: Container(
         width: 220,
+
         decoration: BoxDecoration(
           color: ChatColors.cardBackground,
+
           borderRadius: BorderRadius.circular(14),
+
           boxShadow: [
             BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 16),
           ],
         ),
+
         padding: const EdgeInsets.symmetric(vertical: 6),
+
         child: Column(
           mainAxisSize: MainAxisSize.min,
+
           children: [
             _menuItem(
               Icons.event_note_rounded,
+
               'Doing schedule',
+
               ChatMenuOption.schedule,
             ),
+
             _menuItem(
               Icons.search_rounded,
+
               'Searching for Chat',
+
               ChatMenuOption.search,
             ),
+
             _menuItem(
               Icons.notifications_off_rounded,
+
               'Turn off notifications',
+
               ChatMenuOption.mute,
             ),
+
             _menuItem(
               Icons.error_outline_rounded,
+
               'Report',
+
               ChatMenuOption.report,
             ),
+
             _menuItem(
               Icons.logout_rounded,
+
               'Going out to the chat room',
+
               ChatMenuOption.leave,
+
               color: ChatColors.danger,
             ),
           ],
@@ -490,18 +557,24 @@ class _ChatOptionsMenu extends StatelessWidget {
 
   Widget _menuItem(
     IconData icon,
+
     String label,
+
     ChatMenuOption option, {
+
     Color color = Colors.white,
   }) {
     return InkWell(
       onTap: () => onSelect(option),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+
         child: Row(
           children: [
             Icon(icon, size: 18, color: color),
+
             const SizedBox(width: 12),
+
             Expanded(
               child: Text(label, style: TextStyle(color: color, fontSize: 13)),
             ),

@@ -37,9 +37,9 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   // ----- 로그인 API 호출 -----
@@ -60,7 +60,9 @@ class _SignInPageState extends State<SignInPage> {
 
       // AuthService.login은 statusCode 200 + token이 있을 때만 토큰을 저장함
       if (res['token'] == null) {
-        _showError(res['message']?.toString() ?? 'Please check your email or password.');
+        _showError(
+          res['message']?.toString() ?? 'Please check your email or password.',
+        );
         return;
       }
 
@@ -261,7 +263,10 @@ class _SignInPageState extends State<SignInPage> {
                                   fontSize: 38,
                                 ),
                               ),
-                              const SizedBox(height: 40),
+                              
+
+                              // 이메일 입력창
+                              const SizedBox(height: 20),
                               const Align(
                                 alignment: Alignment.centerLeft,
                                 child: Text(
@@ -285,13 +290,14 @@ class _SignInPageState extends State<SignInPage> {
                                   ),
                                   filled: true,
                                   fillColor: Colors.white.withOpacity(0.08),
+
+                                  // 기본 상태: 테두리 없음
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(30),
-                                    borderSide: const BorderSide(
-                                      color: Colors.white38,
-                                      width: 1,
-                                    ),
+                                    borderSide: BorderSide.none,
                                   ),
+
+                                  // 클릭 상태: 흰색 테두리 표시
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(30),
                                     borderSide: const BorderSide(
@@ -301,7 +307,9 @@ class _SignInPageState extends State<SignInPage> {
                                   ),
                                 ),
                               ),
+
                               const SizedBox(height: 20),
+
                               const Align(
                                 alignment: Alignment.centerLeft,
                                 child: Text(
@@ -312,7 +320,9 @@ class _SignInPageState extends State<SignInPage> {
                                   ),
                                 ),
                               ),
+
                               const SizedBox(height: 10),
+
                               // 비밀번호 입력창
                               TextField(
                                 controller: passwordController,
@@ -326,10 +336,22 @@ class _SignInPageState extends State<SignInPage> {
                                   ),
                                   filled: true,
                                   fillColor: Colors.white12,
-                                  border: OutlineInputBorder(
+
+                                  // 기본 상태: 테두리 없음
+                                  enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(30),
                                     borderSide: BorderSide.none,
                                   ),
+
+                                  // 클릭 상태: 흰색 테두리 표시
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                    borderSide: const BorderSide(
+                                      color: Colors.white,
+                                      width: 1.5,
+                                    ),
+                                  ),
+
                                   suffixIcon: IconButton(
                                     icon: Icon(
                                       obscurePassword
@@ -345,44 +367,8 @@ class _SignInPageState extends State<SignInPage> {
                                   ),
                                 ),
                               ),
+
                               const SizedBox(height: 30),
-                              // 로그인 버튼
-                              SizedBox(
-                                width: double.infinity,
-                                height: 52,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: const Color.fromRGBO(
-                                      10,
-                                      11,
-                                      36,
-                                      1,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                  ),
-                                  onPressed: _isSubmitting ? null : _handleLogin,
-                                  child: _isSubmitting
-                                      ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.4,
-                                            color: Color.fromRGBO(10, 11, 36, 1),
-                                          ),
-                                        )
-                                      : const Text(
-                                          "Log in",
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
                               // 회원가입 및 계정 찾기 링크
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,

@@ -44,7 +44,11 @@ class AuthService {
         'phone': phone,
       }),
     );
-    return jsonDecode(res.body);
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    // 성공/실패를 메시지 문구로 추측하지 않고 실제 HTTP 상태코드로 판단할 수
+    // 있도록 같이 담아서 반환 (login()이 이미 이렇게 statusCode로 판단 중).
+    data['_statusCode'] = res.statusCode;
+    return data;
   }
 
   static Future<Map<String, dynamic>> login(

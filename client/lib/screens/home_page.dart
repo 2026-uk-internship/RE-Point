@@ -4,6 +4,7 @@ import 'alarm_page.dart';
 import 'list_for_auction_page.dart';
 import 'post_auction_page.dart';
 import 'item_detail_page.dart';
+import 'auction_detail_page.dart';
 import '../services/api_service.dart';
 import '../services/current_user.dart';
 
@@ -46,9 +47,9 @@ class _SecondhandItem {
   final String title;
   final String price;
   final String location;
-  final String? imageUrl;
+  String? imageUrl; // 목록 API엔 이미지가 없어서, 상세 API로 나중에 채움
 
-  const _SecondhandItem({
+  _SecondhandItem({
     required this.id,
     required this.title,
     required this.price,
@@ -129,6 +130,10 @@ class _HomePageState extends State<HomePage> {
       communityPosts = _parseCommunityPosts(results[2]);
       _isLoadingFeed = false;
     });
+
+    // 목록은 먼저 보여주고, 사진은 상세 API로 백그라운드에서 채워넣음
+    // (await 안 함 - 사진 늦게 팝인되는 건 괜찮으니 로딩을 막지 않음)
+    _enrichSecondhandImages();
   }
 
   // 상대경로 이미지에 baseUrl을 붙여주는 헬퍼
@@ -137,40 +142,101 @@ class _HomePageState extends State<HomePage> {
     return raw.startsWith('http') ? raw : '${ApiConfig.baseUrl}/$raw';
   }
 
+  // 서버 응답 필드명이 정확히 뭔지 몰라서, 흔히 쓰이는 이미지 키를 다 확인.
+  // (imgUrl 단일 문자열 / images 리스트(문자열 또는 {url:...} 객체) / thumbnail 등)
+  String? _extractRawImage(Map<String, dynamic> e) {
+    for (final key in [
+      'imgUrl',
+      'img_url',
+      'image',
+      'image_url',
+      'thumbnail',
+      'thumbnailUrl',
+      'thumbnail_url',
+      'mainImage',
+      'main_image',
+      'coverImage',
+      'cover_image',
+    ]) {
+      final v = e[key];
+      if (v is String && v.isNotEmpty) return v;
+    }
+    final images = e['images'] ?? e['product_images'] ?? e['productImages'];
+    if (images is List && images.isNotEmpty) {
+      final first = images.first;
+      if (first is String && first.isNotEmpty) return first;
+      if (first is Map) {
+        final url = first['url'] ??
+            first['imageUrl'] ??
+            first['image_url'] ??
+            first['image'] ??
+            first['path'];
+        if (url is String && url.isNotEmpty) return url;
+      }
+    }
+    return null;
+  }
+
   List<_AuctionItem> _parseAuctions(Map<String, dynamic> res) {
     final rawList = (res['data'] is List) ? res['data'] as List : <dynamic>[];
-    return rawList.map((e) {
+    final parsed = rawList.map((e) {
       final id = e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0;
-      // imgUrl(단일 문자열)이 먼저 오는 경우가 많아서 우선 확인, 없으면 images 리스트 확인
-      final images = e['images'];
-      final rawImage = e['imgUrl']?.toString() ??
-          ((images is List && images.isNotEmpty) ? images[0]?.toString() : null);
       final auction = e['auction'] as Map<String, dynamic>?;
       return _AuctionItem(
         id: id,
         title: e['title']?.toString() ?? '',
         price: 'P ${auction?['start_point'] ?? e['point_price'] ?? 0}',
         timeAgo: auction?['end_date']?.toString() ?? '',
-        imageUrl: _resolveImageUrl(rawImage),
+        imageUrl: _resolveImageUrl(_extractRawImage(e)),
       );
     }).toList();
+
+    // 실제 경매 데이터가 아직 없으면(DB 비어있음) 발표용으로 빈 섹션 대신
+    // 보여주기용 더미를 채워둠. 실제 데이터가 생기면 이 분기는 자연히 안 탐.
+    if (parsed.isEmpty) return _demoAuctions;
+    return parsed;
   }
+
+  static const List<_AuctionItem> _demoAuctions = [
+    _AuctionItem(id: -1, title: 'Vintage Camera', price: 'P 320', timeAgo: '2h left'),
+    _AuctionItem(id: -2, title: 'Leather Jacket', price: 'P 180', timeAgo: '5h left'),
+    _AuctionItem(id: -3, title: 'Bluetooth Speaker', price: 'P 95', timeAgo: '1d left'),
+  ];
 
   List<_SecondhandItem> _parseSecondhand(Map<String, dynamic> res) {
     final rawList = (res['data'] is List) ? res['data'] as List : <dynamic>[];
     return rawList.map((e) {
       final id = e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0;
-      final images = e['images'];
-      final rawImage = e['imgUrl']?.toString() ??
-          ((images is List && images.isNotEmpty) ? images[0]?.toString() : null);
       return _SecondhandItem(
         id: id,
         title: e['title']?.toString() ?? '',
-        price: '£${e['money_price'] ?? 0}',
+        price: '£${e['price'] ?? 0}', // 실제 목록 API 필드명은 'price' (money_price 아님)
         location: e['location']?.toString() ?? '',
-        imageUrl: _resolveImageUrl(rawImage),
+        imageUrl: _resolveImageUrl(_extractRawImage(e)), // 목록 응답엔 보통 없음, 상세 조회로 나중에 채워짐
       );
     }).toList();
+  }
+
+  // 목록 API 응답엔 이미지 필드가 없어서, 상품 상세 API를 각각 호출해서
+  // 진짜 사진을 채워넣음. (상세 페이지에서는 사진이 잘 뜨는 걸 확인했으므로
+  // 같은 파싱 로직을 재사용)
+  Future<void> _enrichSecondhandImages() async {
+    await Future.wait(
+      nearbySecondhand.map((item) async {
+        try {
+          final res = await ProductService.getProductDetail(item.id);
+          final data = (res['data'] is Map<String, dynamic>)
+              ? res['data'] as Map<String, dynamic>
+              : res;
+          final resolved = _resolveImageUrl(_extractRawImage(data));
+          if (resolved != null && mounted) {
+            setState(() => item.imageUrl = resolved);
+          }
+        } catch (_) {
+          // 개별 상품 이미지 조회 실패는 무시 (그 카드만 아이콘 placeholder로 남음)
+        }
+      }),
+    );
   }
 
   List<_CommunityPost> _parseCommunityPosts(Map<String, dynamic> res) {
@@ -199,6 +265,16 @@ class _HomePageState extends State<HomePage> {
       context,
       MaterialPageRoute(
         builder: (_) => ItemDetailPage(productId: productId),
+      ),
+    );
+  }
+
+  // 경매 상품 카드를 탭하면 경매 전용 상세 페이지로 이동
+  void _navigateToAuctionDetail(int auctionId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AuctionDetailPage(auctionId: auctionId),
       ),
     );
   }
@@ -358,7 +434,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _auctionCard(_AuctionItem item) {
     return GestureDetector(
-      onTap: () => _navigateToDetail(item.id),
+      onTap: item.id >= 0 ? () => _navigateToAuctionDetail(item.id) : null,
       child: SizedBox(
         width: 110,
         child: Column(
@@ -470,16 +546,39 @@ class _HomePageState extends State<HomePage> {
     return Container(
       width: size,
       height: size,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white10,
         borderRadius: BorderRadius.circular(16),
-        image: imageUrl != null
-            ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
-            : null,
       ),
       child: imageUrl == null
           ? const Icon(Icons.image_outlined, color: Colors.white30, size: 28)
-          : null,
+          : Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              width: size,
+              height: size,
+              // 이미지 로드 실패해도 빈 박스로 방치하지 않고 아이콘으로 대체
+              // (예전엔 DecorationImage라 실패 시 그냥 안 보이기만 했음)
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.image_outlined,
+                color: Colors.white30,
+                size: 28,
+              ),
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return const Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white30,
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 
