@@ -84,6 +84,9 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
   // 3. 좋아요(찜) 버튼 탭 API 연동
   Future<void> _toggleLike() async {
     final previousState = _isFavorite;
+    final previousCount = _likeCount;
+
+    // 낙관적 업데이트: 서버 응답 기다리지 않고 먼저 화면 반영
     setState(() {
       _isFavorite = !_isFavorite;
       _likeCount += _isFavorite ? 1 : -1;
@@ -91,18 +94,28 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
 
     try {
       final res = await ProductService.toggleFavorite(widget.productId);
-      debugPrint('🔍 [Favorite] 응답: $res'); // 실제 성공 판정 조건 확인용
+      debugPrint('🔍 [Favorite] 응답: $res');
 
-      if (res['success'] != true && res['message'] == null) {
+      // 실제 서버 응답 형태: { data: { favorited: bool, favoriteCount: int } }
+      final data = res['data'];
+      if (data is Map && data['favorited'] != null) {
+        // 서버가 준 진짜 값으로 확정. 낙관적으로 미리 그려둔 값과 다르면
+        // 여기서 자동으로 바로잡힘 (동시성 문제 등으로 어긋났을 때 대비).
+        setState(() {
+          _isFavorite = data['favorited'] as bool;
+          _likeCount = (data['favoriteCount'] as num).toInt();
+        });
+      } else {
+        // 응답 형태가 예상과 다르면 실패로 간주하고 롤백
         setState(() {
           _isFavorite = previousState;
-          _likeCount += _isFavorite ? 1 : -1;
+          _likeCount = previousCount;
         });
       }
     } catch (e) {
       setState(() {
         _isFavorite = previousState;
-        _likeCount += _isFavorite ? 1 : -1;
+        _likeCount = previousCount;
       });
       debugPrint('찜하기 요청 실패: $e');
     }
