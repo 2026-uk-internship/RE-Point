@@ -36,8 +36,20 @@ class CurrentUser {
           ? data['user'] as Map<String, dynamic>
           : data;
 
-      id = user['id'] is int ? user['id'] as int : int.tryParse('${user['id']}');
-      username = user['username']?.toString() ??
+      // ⚠️ 현재 /users/me 응답에는 id 필드가 없음 (name, img, temperature,
+      // totalPoint 등만 내려줌). id는 AuthService.login()이 로그인 응답의
+      // data.id로 이미 채워둔 상태이므로, 여기서는 응답에 id가 "있을 때만"
+      // 갱신하고 없으면 기존 값을 그대로 유지합니다. (없다고 null로 덮어쓰면
+      // 로그인 때 채워둔 값이 날아가서 채팅 isMe 판별이 깨짐)
+      final parsedId = user['id'] is int
+          ? user['id'] as int
+          : int.tryParse('${user['id']}');
+      if (parsedId != null) {
+        id = parsedId;
+      }
+
+      username =
+          user['username']?.toString() ??
           user['nickname']?.toString() ??
           user['name']?.toString();
       email = user['email']?.toString();
@@ -45,11 +57,14 @@ class CurrentUser {
       location = (rawLocation is Map)
           ? (rawLocation['name'] ?? rawLocation['location'])?.toString()
           : rawLocation?.toString();
-      final pointValue = user['point'] ?? user['points'];
+      final pointValue =
+          user['point'] ?? user['points'] ?? user['availablePoint'];
       points = pointValue is int ? pointValue : int.tryParse('$pointValue');
-      avatarUrl = user['profileImage']?.toString() ??
+      avatarUrl =
+          user['profileImage']?.toString() ??
           user['avatarUrl']?.toString() ??
-          user['profile_image']?.toString();
+          user['profile_image']?.toString() ??
+          user['img']?.toString();
 
       debugPrint(
         '🔍 [Profile] 파싱 결과 -> id: $id, username: $username, '
