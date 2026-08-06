@@ -94,27 +94,56 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
     }
   }
 
-  // 4. 채팅 시작하기 API / 화면 이동
-  Future<void> _startChat() async {
-    if (_productData == null) return;
+  // 4. 채팅 시작하기: 서버에 방 생성/조회 요청 → 진짜 roomId로 이동
+  bool _isStartingChat = false;
 
-    final sellerId =
-        _productData!['userId'] ?? _productData!['seller']?['id'] ?? 0;
+  Future<void> _startChat() async {
+    if (_productData == null || _isStartingChat) return;
+
     final sellerName =
         _productData!['userName'] ??
         _productData!['seller']?['username'] ??
         'Seller';
 
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ChatRoomScreen(
-            roomId: 'room_${widget.productId}',
-            opponentName: sellerName,
+    setState(() => _isStartingChat = true);
+
+    try {
+      final res = await ChatRoomService.createOrJoinRoom(widget.productId);
+
+      // 성공: { "data": { "roomId": 123 } }
+      // 실패: { "message": "..." }
+      if (res['data'] != null && res['data']['roomId'] != null) {
+        final roomId = res['data']['roomId']; // int (insertId / 기존 room.id)
+
+        if (!mounted) return;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatRoomScreen(
+              roomId: roomId, // ⚠️ ChatRoomScreen 쪽 roomId 타입이 int인지 확인 필요
+              opponentName: sellerName,
+            ),
           ),
-        ),
-      );
+        );
+      } else {
+        // 서버가 message로 내려주는 에러 (본인 상품, 상품 없음 등)
+        final message = res['message']?.toString() ?? '채팅방을 열 수 없습니다.';
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(message)));
+        }
+      }
+    } catch (e) {
+      debugPrint('채팅방 생성/입장 실패: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('네트워크 오류로 채팅방을 열 수 없습니다.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isStartingChat = false);
     }
   }
 
