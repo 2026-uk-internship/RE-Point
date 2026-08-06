@@ -263,51 +263,14 @@ class _SignInPageState extends State<SignInPage> {
                                   fontSize: 38,
                                 ),
                               ),
-                              const SizedBox(height: 40),
-                              const Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  "E-mail",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
+                              
+
                               // 이메일 입력창
-                              TextField(
-                                controller: emailController,
-                                keyboardType: TextInputType.emailAddress,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: InputDecoration(
-                                  hintText: "Enter your E-mail",
-                                  hintStyle: const TextStyle(
-                                    color: Colors.white70,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white.withOpacity(0.08),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                    borderSide: const BorderSide(
-                                      color: Colors.white38,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                    borderSide: const BorderSide(
-                                      color: Colors.white,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                ),
-                              ),
                               const SizedBox(height: 20),
                               const Align(
                                 alignment: Alignment.centerLeft,
                                 child: Text(
-                                  "Password",
+                                  "E-mail",
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
