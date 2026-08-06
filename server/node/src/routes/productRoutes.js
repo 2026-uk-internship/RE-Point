@@ -6,7 +6,6 @@ const bidController = require("../controllers/bidController");
 const { verifyToken } = require("../middlewares/authMiddleware");
 const upload = require("../config/upload");
 const favoriteController = require("../controllers/favoriteController");
-const bidController = require("../controllers/bidController");
 
 router.post(
   "/",
