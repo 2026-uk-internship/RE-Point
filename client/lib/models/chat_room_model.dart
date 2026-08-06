@@ -1,52 +1,73 @@
-/// 채팅 목록 화면(디자인의 "sub" 화면)에서 쓰이는 채팅방 요약 모델.
+/// 채팅방 목록 모델.
+/// 백엔드 roomModel.js의 getRoomList (GET /rooms) 응답 필드에 맞춰 구성했습니다.
 class ChatRoomModel {
-  final String id;
-  final String opponentId;
-  final String opponentName;
-  final String? opponentAvatarUrl;
-  final String? itemImageUrl; // 👈 1. 게시물(상품) 사진 URL 필드 추가
-  final String lastMessage;
-  final DateTime lastMessageAt;
-  final int unreadCount;
+  final String id; // roomId
+  final String counterpartName;
+  final String? counterpartImg;
+  final String? productImg;
+  final String lastMessage; // Text 위젯에 non-null로 바로 쓰여서 기본값 '' 처리
+  final String? lastMessageHoursAgo; // 백엔드가 "N시간 전" 형태의 문자열로 내려줌
+
+  // 아래 두 개는 현재 GET /rooms 응답(getRoomList)에 없는 값입니다.
+  // TODO: 백엔드에 온라인 상태 / 안 읽은 메시지 수 필드 추가 요청 필요. 그 전까지는 기본값으로 둡니다.
   final bool isOpponentOnline;
+  final int unreadCount;
 
   ChatRoomModel({
     required this.id,
-    required this.opponentId,
-    required this.opponentName,
-    this.opponentAvatarUrl,
-    this.itemImageUrl, // 👈 2. 생성자에 추가 (기본값 null)
-    required this.lastMessage,
-    required this.lastMessageAt,
-    this.unreadCount = 0,
+    required this.counterpartName,
+    this.counterpartImg,
+    this.productImg,
+    this.lastMessage = '',
+    this.lastMessageHoursAgo,
     this.isOpponentOnline = false,
+    this.unreadCount = 0,
   });
+
+  // 프론트(ChatBubble 등)가 이미 이 이름들로 쓰고 있어서 실제 필드의 별칭으로 제공.
+  String get opponentName => counterpartName;
+  String? get opponentAvatarUrl => counterpartImg;
+  String get relativeTime => lastMessageHoursAgo ?? '';
 
   factory ChatRoomModel.fromJson(Map<String, dynamic> json) {
     return ChatRoomModel(
-      id: json['id'].toString(),
-      opponentId: json['opponentId'].toString(),
-      opponentName: json['opponentName'] as String,
-      opponentAvatarUrl: json['opponentAvatarUrl'] as String?,
-      itemImageUrl: json['itemImageUrl'] as String?, // 👈 3. JSON 파싱 처리 추가
+      id: json['roomId'].toString(),
+      counterpartName: json['counterpartName'] as String? ?? '',
+      counterpartImg: json['counterpartImg'] as String?,
+      productImg: json['productImg'] as String?,
       lastMessage: json['lastMessage'] as String? ?? '',
-      lastMessageAt: DateTime.parse(json['lastMessageAt'] as String),
-      unreadCount: json['unreadCount'] as int? ?? 0,
+      lastMessageHoursAgo: json['lastMessageHoursAgo'] as String?,
+      // 백엔드가 나중에 필드를 추가하면 자동으로 반영되도록 optional로 읽어둠
       isOpponentOnline: json['isOpponentOnline'] as bool? ?? false,
+      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
     );
   }
+}
 
-  /// 목록 화면에 "Just Now", "Two days ago" 처럼 상대 시간으로 보여주기 위한 헬퍼.
-  String get relativeTime {
-    final diff = DateTime.now().difference(lastMessageAt);
-    if (diff.inMinutes < 1) return 'Just Now';
-    if (diff.inHours < 1) return '${diff.inMinutes} min ago';
-    if (diff.inDays < 1) return '${diff.inHours}h ago';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
-    final weeks = (diff.inDays / 7).floor();
-    if (weeks < 4) return weeks == 1 ? 'A week ago' : '$weeks weeks ago';
-    final months = (diff.inDays / 30).floor();
-    return months <= 1 ? 'One month ago' : '$months months ago';
+/// 채팅방 상단(상대방 정보) 표시용 모델.
+/// chatSocket.js의 'room_info' 이벤트 페이로드에 대응합니다.
+/// (counterpartName, counterpartTemperature, counterpartTemperatureLevel, productImg)
+class ChatRoomInfoModel {
+  final String counterpartName;
+  final num? counterpartTemperature;
+  final String?
+  counterpartTemperatureLevel; // getTemperatureLevel()의 반환값 - 정확한 값 종류(예: "hot"/"warm"/"cold")는 백엔드 utils/temperature.js 확인 필요
+  final String? productImg;
+
+  ChatRoomInfoModel({
+    required this.counterpartName,
+    this.counterpartTemperature,
+    this.counterpartTemperatureLevel,
+    this.productImg,
+  });
+
+  factory ChatRoomInfoModel.fromJson(Map<String, dynamic> json) {
+    return ChatRoomInfoModel(
+      counterpartName: json['counterpartName'] as String? ?? '',
+      counterpartTemperature: json['counterpartTemperature'] as num?,
+      counterpartTemperatureLevel: json['counterpartTemperatureLevel']
+          ?.toString(),
+      productImg: json['productImg'] as String?,
+    );
   }
 }

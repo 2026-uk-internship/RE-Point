@@ -145,6 +145,11 @@ CREATE TABLE category (
     co2_saved DECIMAL(10, 2) DEFAULT 0            -- 변경: 탄소 절감량 추정 가중치 (kg CO2)
 );
 
+CREATE TABLE category_group (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL UNIQUE
+);
+
 CREATE TABLE user_category (
 	id INTEGER PRIMARY KEY AUTO_INCREMENT,
     user_id INTEGER NOT NULL,
