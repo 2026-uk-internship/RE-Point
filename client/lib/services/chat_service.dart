@@ -13,20 +13,14 @@ import 'current_user.dart'; // CurrentUser
 ///
 /// - 채팅방 목록 조회 / 생성-입장 : REST (roomRouter.js)
 /// - 채팅방 입장, 메시지 내역, 실시간 메시지, 타이핑 표시 : Socket.IO (chatSocket.js)
-///
-/// pubspec.yaml에 아래 패키지가 필요합니다.
-///   http: ^1.2.0
-///   socket_io_client: ^2.0.3+1
 class ChatService {
   static final ChatService instance = ChatService._internal();
   ChatService._internal();
 
   static const String _baseUrl = 'https://re-point.up.railway.app';
 
-  // 로그인 시 AuthService.login()이 저장해두는 진짜 토큰을 그대로 참조.
   String? get _token => ApiConfig.token;
 
-  /// 프론트가 ChatService.currentUserId처럼 클래스 레벨에서 바로 접근하고 있어서 static으로 제공.
   static String get currentUserId => CurrentUser.id?.toString() ?? '';
 
   Map<String, String> get _authHeaders {
@@ -43,8 +37,6 @@ class ChatService {
   // REST: 채팅방 목록 / 생성
   // ---------------------------------------------------------------------
 
-  /// 채팅방 목록 조회
-  /// GET /rooms  (keyword 지정 시 상대방 이름으로 필터링)
   Future<List<ChatRoomModel>> fetchChatRooms({String? keyword}) async {
     final uri = Uri.parse('$_baseUrl/rooms').replace(
       queryParameters: keyword != null && keyword.isNotEmpty
@@ -61,9 +53,6 @@ class ChatService {
         .toList();
   }
 
-  /// 상품 기준으로 채팅방 생성 또는 기존 방 입장
-  /// POST /rooms  { productId }
-  /// 실패 시 PRODUCT_NOT_FOUND / CANNOT_CHAT_WITH_SELF 코드가 던져질 수 있습니다.
   Future<String> createOrEnterRoom(String productId) async {
     final uri = Uri.parse('$_baseUrl/rooms');
     final res = await http.post(
@@ -98,6 +87,11 @@ class ChatService {
   IO.Socket? _socket;
   String? _currentRoomId;
 
+  // 이 소켓이 지금까지 join한 방 id들을 계속 추적.
+  // leave_room을 못 보내는 예외 상황(연결 끊김 등)이 생겨도
+  // 최소한 클라이언트 필터링(messageStream 구독 쪽)의 근거로 쓸 수 있게 별도로 들고 있음.
+  final Set<String> _joinedRoomIds = {};
+
   final _roomInfoController = StreamController<ChatRoomInfoModel>.broadcast();
   final _historyController = StreamController<List<MessageModel>>.broadcast();
   final _messageController = StreamController<MessageModel>.broadcast();
@@ -105,26 +99,20 @@ class ChatService {
   final _stopTypingController = StreamController<String>.broadcast(); // userId
   final _errorController = StreamController<String>.broadcast();
 
-  /// 채팅방 상단 상대방 정보 ('room_info' 이벤트)
   Stream<ChatRoomInfoModel> get roomInfoStream => _roomInfoController.stream;
-
-  /// 방 입장 시 받는 과거 메시지 목록 ('chat_history' 이벤트)
   Stream<List<MessageModel>> get historyStream => _historyController.stream;
 
-  /// 실시간으로 도착하는 메시지 (내가 보낸 것 포함, 'receive_message' 이벤트)
+  /// 실시간으로 도착하는 메시지 (내가 보낸 것 포함, 'receive_message' 이벤트).
+  /// 주의: 이 스트림은 ChatService 전역에서 하나만 존재하는 broadcast stream입니다.
+  /// 소켓이 여러 방에 join되어 있으면 그 방들 메시지가 전부 여기로 섞여 들어오므로,
+  /// 반드시 구독하는 쪽(ChatRoomScreen)에서 msg.chatRoomId를 확인하고 필터링해야 합니다.
   Stream<MessageModel> get messageStream => _messageController.stream;
 
-  /// 상대방이 입력 중일 때 상대방 userId가 흘러옴
   Stream<String> get userTypingStream => _typingController.stream;
-
-  /// 상대방이 입력을 멈췄을 때 상대방 userId가 흘러옴
   Stream<String> get userStopTypingStream => _stopTypingController.stream;
-
-  /// 소켓 연결/인증 에러 메시지
   Stream<String> get errorStream => _errorController.stream;
 
   /// 소켓 연결. 앱 시작 시 또는 채팅 화면 진입 시 한 번 호출.
-  /// 채팅방 입장은 [joinRoom]으로 별도 수행합니다.
   void connect() {
     if (_socket != null) return; // 이미 연결(또는 연결 시도) 중
 
@@ -133,9 +121,7 @@ class ChatService {
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
-          .setAuth({
-            'token': _token,
-          }) // chatSocket.js: socket.handshake.auth.token
+          .setAuth({'token': _token})
           .build(),
     );
 
@@ -163,6 +149,9 @@ class ChatService {
       })
       ..on('receive_message', (data) {
         final map = Map<String, dynamic>.from(data as Map);
+        // 서버가 roomId를 안 실어 보내는 경우를 대비한 fallback이지만,
+        // 소켓이 여러 방에 join되어 있으면 이 fallback 자체가 오염원이 될 수 있음.
+        // → 서버 쪽에서 receive_message에 roomId를 항상 포함해서 보내도록 확인 필요.
         final roomId = (map['roomId'] ?? _currentRoomId).toString();
         _messageController.add(
           MessageModel.fromJson(
@@ -184,7 +173,6 @@ class ChatService {
     _socket!.connect();
   }
 
-  /// 소켓이 실제로 연결될 때까지 대기 (join_room을 연결 전에 보내는 걸 방지).
   Future<void> _ensureConnected() {
     if (_socket != null && _socket!.connected) return Future.value();
 
@@ -202,16 +190,19 @@ class ChatService {
     );
   }
 
-  /// 특정 채팅방에 입장. 입장하면 서버가 'room_info'와 'chat_history'를 보내줍니다.
+  /// 특정 채팅방에 입장.
+  /// 이전에 다른 방에 join되어 있었다면 그 방은 먼저 leave 처리합니다.
+  /// (서버 chatSocket.js의 join_room 핸들러도 socket.leave() 로직이 있는지 함께 확인 필요)
   void joinRoom(String roomId) {
+    if (_currentRoomId != null && _currentRoomId != roomId) {
+      _socket?.emit('leave_room', _currentRoomId);
+      _joinedRoomIds.remove(_currentRoomId);
+    }
     _currentRoomId = roomId;
+    _joinedRoomIds.add(roomId);
     _socket?.emit('join_room', roomId);
   }
 
-  /// [ChatRoomScreen], [ChatSearchPage] 등 화면이 기존 REST 스타일(await로 한 번에
-  /// 리스트 받기)로 짜여 있어서, socket 기반이지만 겉으로는 Future로 감싸주는 호환 메서드입니다.
-  /// 내부적으로 join_room을 보내고 첫 chat_history 응답을 기다렸다가 반환합니다.
-  /// 실시간으로 이어지는 메시지가 필요하면 [messageStream]을 직접 구독하세요.
   Future<List<MessageModel>> fetchMessages(String roomId) async {
     await _ensureConnected();
 
@@ -233,8 +224,6 @@ class ChatService {
     );
   }
 
-  /// 메시지 전송. 서버가 같은 방의 전원(보낸 사람 포함)에게 브로드캐스트하므로,
-  /// 실제 도착 확인은 [messageStream]으로 받으세요. 여기서는 emit만 하고 즉시 반환합니다.
   Future<void> sendMessage({
     required String roomId,
     required String text,
@@ -251,16 +240,15 @@ class ChatService {
     _socket?.emit('stop_typing', {'roomId': roomId});
   }
 
-  /// 채팅방 나가기 (메뉴의 "Going out to the chat room").
-  /// TODO: 백엔드에 명시적인 나가기 REST/소켓 이벤트가 없어 현재는 클라이언트 상태만 정리합니다.
-  /// 백엔드팀에 DELETE /rooms/:roomId 또는 'leave_room' 소켓 이벤트 추가를 요청하는 걸 추천해요.
+  /// 채팅방 나가기 (메뉴의 "Going out to the chat room" 또는 화면 dispose 시 호출).
+  /// 서버에 leave_room을 실제로 emit해서 socket.io room 멤버십에서 빠지도록 합니다.
+  /// TODO: 백엔드에 leave_room 소켓 핸들러가 없다면 추가 요청 필요.
   Future<void> leaveChatRoom(String roomId) async {
+    _socket?.emit('leave_room', roomId);
+    _joinedRoomIds.remove(roomId);
     if (_currentRoomId == roomId) _currentRoomId = null;
   }
 
-  /// 알림 끄기 토글.
-  /// TODO: 지금까지 보여주신 roomRouter.js / chatSocket.js에는 이 라우트가 없었습니다.
-  /// 백엔드에 PATCH /rooms/:roomId/notifications (또는 다른 경로) 존재 여부 확인 필요.
   Future<void> toggleNotification(String roomId, bool mute) async {
     final uri = Uri.parse('$_baseUrl/rooms/$roomId/notifications');
     final res = await http.patch(
@@ -272,7 +260,18 @@ class ChatService {
   }
 
   /// 앱 종료/로그아웃 등 완전히 연결을 끊을 때.
+  /// 반드시 로그아웃 플로우에서 호출해야 합니다. 이걸 안 부르면
+  /// - 소켓이 이전 유저의 토큰(auth)으로 계속 붙어있고
+  /// - 이전에 join했던 방 멤버십도 그대로 남아있어서
+  /// 재로그인 후 엉뚱한 방 메시지가 섞여 들어오는 원인이 됩니다.
   void disconnect() {
+    // 살아있던 방들 전부 leave 시도 (best-effort)
+    for (final roomId in _joinedRoomIds) {
+      _socket?.emit('leave_room', roomId);
+    }
+    _joinedRoomIds.clear();
+
+    _socket?.offAny();
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
@@ -290,9 +289,6 @@ class ChatService {
   }
 }
 
-/// 채팅 API 호출 실패 시 던지는 예외.
-/// 백엔드가 던지는 PRODUCT_NOT_FOUND, CANNOT_CHAT_WITH_SELF 같은 코드를 그대로 담아
-/// UI 단에서 code로 분기해 적절한 메시지를 보여줄 수 있게 합니다.
 class ChatServiceException implements Exception {
   final String message;
   final String code;
