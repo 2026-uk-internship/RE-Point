@@ -28,9 +28,6 @@ class ChatRoomScreen extends StatefulWidget {
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
 }
 
-/// 서버 응답을 기다리는 중인 낙관적(optimistic) 메시지 하나.
-/// receive_message로 내가 보낸 메시지가 돌아왔을 때, text로 매칭해서
-/// 화면에 미리 그려둔 임시 메시지를 실제 메시지로 교체하는 데 씁니다.
 class _PendingOptimistic {
   final String tempId;
   final String text;
@@ -45,7 +42,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   List<MessageModel> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
-  bool _hasLoadError = false; // 메시지 조회 실패 시 재시도 UI를 보여주기 위한 플래그
+  bool _hasLoadError = false;
 
   final List<_PendingOptimistic> _pending = [];
   StreamSubscription<MessageModel>? _messageSub;
@@ -60,11 +57,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _loadMessages();
   }
 
-  /// 실시간 메시지 수신. 내가 보낸 메시지의 서버 확정본이 오면 낙관적 메시지를
-  /// 교체하고, 상대방이 보낸 메시지는 그대로 리스트에 추가합니다.
+  /// 실시간 메시지 수신.
+  /// ChatService.messageStream은 앱 전역에서 하나뿐인 broadcast stream이라
+  /// 소켓이 다른 방에 join된 상태로 남아있으면 그 방 메시지까지 여기로 들어올 수 있음.
+  /// 그래서 이 화면(widget.roomId)에 해당하는 메시지만 받도록 반드시 먼저 걸러냄.
   void _listenIncomingMessages() {
     _messageSub = _chatService.messageStream.listen((msg) {
       if (!mounted) return;
+      if (msg.chatRoomId != widget.roomId) return; // ★ 다른 방 메시지 무시
+
       setState(() {
         if (msg.isMe && _pending.isNotEmpty) {
           final idx = _pending.indexWhere((p) => p.text == msg.text);
@@ -85,8 +86,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     });
   }
 
-  /// 메시지 목록 조회. 실패(타임아웃/네트워크 오류 등) 시에도
-  /// _isLoading이 반드시 해제되도록 try/catch/finally로 감쌈.
   Future<void> _loadMessages() async {
     setState(() {
       _isLoading = true;
@@ -128,8 +127,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     setState(() => _isSending = true);
     _messageController.clear();
 
-    // 낙관적 업데이트: 서버 응답 기다리지 않고 먼저 화면에 보여줌.
-    // 실제 서버 확정본은 _listenIncomingMessages()가 받아서 이 임시 메시지를 교체합니다.
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final optimisticMessage = MessageModel(
       id: tempId,
@@ -166,7 +163,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _menuOverlay = OverlayEntry(
       builder: (context) => Stack(
         children: [
-          // 바깥 영역 탭하면 닫히도록 하는 투명 레이어
           Positioned.fill(
             child: GestureDetector(
               onTap: _closeMenu,
@@ -248,6 +244,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   @override
   void dispose() {
+    // 메뉴에서 명시적으로 "Leave"를 안 눌러도, 화면을 그냥 뒤로가기로 나갈 때도
+    // 서버에 leave_room을 보내서 소켓이 이 방에 계속 남아있지 않게 함.
+    // (leave_room을 서버가 idempotent하게 처리한다는 전제 — 이미 나간 방에 또 보내도 안전해야 함)
+    _chatService.leaveChatRoom(widget.roomId);
     _messageSub?.cancel();
     _closeMenu();
     _messageController.dispose();
@@ -290,7 +290,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     );
   }
 
-  /// 메시지 조회 실패 시 보여주는 재시도 화면.
   Widget _buildLoadErrorView() {
     return Center(
       child: Column(
@@ -435,47 +434,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
 enum ChatMenuOption { schedule, search, mute, report, leave }
 
-/// 우측 상단 햄버거 아이콘을 눌렀을 때 뜨는 드롭다운 메뉴.
-/// 디자인 시안의 "doing schedule / Searching for Chat / Turn off notifications / Report / Going out to the chat room" 항목 구성.
 class _ChatOptionsMenu extends StatelessWidget {
   final ValueChanged<ChatMenuOption> onSelect;
 
   const _ChatOptionsMenu({required this.onSelect});
-
-  void _handleOptionSelect(BuildContext context, ChatMenuOption option) {
-    onSelect(option);
-
-    switch (option) {
-      case ChatMenuOption.schedule:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const SchedulePage()),
-        );
-        break;
-
-      // case ChatMenuOption.search: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!나중에 수정할 것
-      //   Navigator.push(
-      //     context,
-      //     MaterialPageRoute(builder: (context) => const ChatSearchPage()),
-      //   );
-      //   break;
-
-      // case ChatMenuOption.report:
-      //   showDialog(
-      //     context: context,
-      //     builder: (context) => const ReportListingDialog(),
-      //   );
-      //   break;
-
-      case ChatMenuOption.mute:
-        // 알림 켜기/끄기 로직
-        break;
-
-      case ChatMenuOption.leave:
-        // 채팅방 나가기 처리 로직
-        break;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -495,31 +457,26 @@ class _ChatOptionsMenu extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _menuItem(
-              context,
               Icons.event_note_rounded,
               'Doing schedule',
               ChatMenuOption.schedule,
             ),
             _menuItem(
-              context,
               Icons.search_rounded,
               'Searching for Chat',
               ChatMenuOption.search,
             ),
             _menuItem(
-              context,
               Icons.notifications_off_rounded,
               'Turn off notifications',
               ChatMenuOption.mute,
             ),
             _menuItem(
-              context,
               Icons.error_outline_rounded,
               'Report',
               ChatMenuOption.report,
             ),
             _menuItem(
-              context,
               Icons.logout_rounded,
               'Going out to the chat room',
               ChatMenuOption.leave,
@@ -532,14 +489,13 @@ class _ChatOptionsMenu extends StatelessWidget {
   }
 
   Widget _menuItem(
-    BuildContext context,
     IconData icon,
     String label,
     ChatMenuOption option, {
     Color color = Colors.white,
   }) {
     return InkWell(
-      onTap: () => _handleOptionSelect(context, option),
+      onTap: () => onSelect(option),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
