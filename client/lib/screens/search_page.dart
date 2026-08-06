@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 import '../theme/chat_theme.dart';
+import 'search_results_page.dart';
+import '../services/api_service.dart';
+
+// 최근 검색어 한 건 (삭제 API 호출에 필요한 id를 함께 들고 있음).
+class _RecentSearch {
+  final int? id; // 서버에서 내려준 id (로컬에서 막 추가한 경우엔 null일 수 있음)
+  final String keyword;
+  const _RecentSearch({this.id, required this.keyword});
+}
 
 /// 검색 탭 화면 (Search Page).
 class SearchPage extends StatefulWidget {
@@ -13,16 +22,8 @@ class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
-  List<String> _recentSearches = ['pallet', 'paint', 'brush'];
-
-  final List<String> _recommendedTags = [
-    'Paints',
-    'Winsor & Newton',
-    'Reeves',
-    'Reeves',
-    'Reeves',
-    'Michael Harding',
-  ];
+  List<_RecentSearch> _recentSearches = [];
+  List<String> _recommendedTags = [];
 
   final List<_SimilarItem> _similarItems = const [
     _SimilarItem(imageUrl: null),
@@ -31,10 +32,64 @@ class _SearchPageState extends State<SearchPage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadSearchMeta();
+  }
+
+  Future<void> _loadSearchMeta() async {
+    // 최근 검색어 / 인기 검색어를 병렬로 불러옴
+    final results = await Future.wait([
+      SearchService.getRecentSearches(),
+      SearchService.getPopularKeywords(),
+    ], eagerError: false);
+
+    if (!mounted) return;
+    setState(() {
+      final recentRaw = (results[0]['data'] is List) ? results[0]['data'] as List : <dynamic>[];
+      _recentSearches = recentRaw
+          .map((e) => _RecentSearch(
+                id: e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}'),
+                keyword: e['keyword']?.toString() ?? '',
+              ))
+          .toList();
+
+      final popularRaw = (results[1]['data'] is List) ? results[1]['data'] as List : <dynamic>[];
+      _recommendedTags = popularRaw.map((e) => e['keyword']?.toString() ?? e.toString()).toList();
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _runSearch(String query) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    setState(() {
+      _recentSearches.removeWhere((s) => s.keyword == trimmed);
+      _recentSearches.insert(0, _RecentSearch(keyword: trimmed));
+    });
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SearchResultsPage(initialQuery: trimmed),
+      ),
+    );
+  }
+
+  Future<void> _removeRecentSearch(_RecentSearch search) async {
+    setState(() => _recentSearches.remove(search));
+    if (search.id != null) {
+      try {
+        await SearchService.deleteRecentSearch(search.id!);
+      } catch (e) {
+        // 삭제 실패해도 화면에서는 이미 지운 채로 둠 (다음 조회 때 서버와 동기화됨)
+      }
+    }
   }
 
   @override
@@ -96,13 +151,7 @@ class _SearchPageState extends State<SearchPage> {
                 border: InputBorder.none,
                 isDense: true,
               ),
-              onSubmitted: (value) {
-                if (value.trim().isNotEmpty) {
-                  setState(() {
-                    _recentSearches.insert(0, value.trim());
-                  });
-                }
-              },
+              onSubmitted: (value) => _runSearch(value),
             ),
           ),
           if (_searchController.text.isNotEmpty)
@@ -182,7 +231,9 @@ class _SearchPageState extends State<SearchPage> {
       runSpacing: 8,
       children: _recentSearches
           .map(
-            (search) => Container(
+            (search) => GestureDetector(
+              onTap: () => _runSearch(search.keyword),
+              child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.08),
@@ -193,16 +244,12 @@ class _SearchPageState extends State<SearchPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    search,
+                    search.keyword,
                     style: const TextStyle(color: Colors.white, fontSize: 12),
                   ),
                   const SizedBox(width: 6),
                   GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _recentSearches.remove(search);
-                      });
-                    },
+                    onTap: () => _removeRecentSearch(search),
                     child: const Icon(
                       Icons.close,
                       size: 14,
@@ -210,6 +257,7 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                   ),
                 ],
+              ),
               ),
             ),
           )
@@ -226,9 +274,7 @@ class _SearchPageState extends State<SearchPage> {
           .map(
             (tag) => InkWell(
               borderRadius: BorderRadius.circular(20),
-              onTap: () {
-                _searchController.text = tag;
-              },
+              onTap: () => _runSearch(tag),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,

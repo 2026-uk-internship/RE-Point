@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'main_page.dart';
 import 'create_account_page.dart';
+import '../services/api_service.dart';
+import '../services/current_user.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -13,6 +15,7 @@ class _SignInPageState extends State<SignInPage> {
   final controller = PageController();
   int currentPage = 0;
   bool obscurePassword = true;
+  bool _isSubmitting = false; // 로그인 API 호출 중 버튼 중복 탭 방지
 
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -31,6 +34,49 @@ class _SignInPageState extends State<SignInPage> {
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
     );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  // ----- 로그인 API 호출 -----
+  Future<void> _handleLogin() async {
+    if (_isSubmitting) return;
+
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      _showError('이메일과 비밀번호를 입력해주세요.');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final res = await AuthService.login(email, password);
+
+      // AuthService.login은 statusCode 200 + token이 있을 때만 토큰을 저장함
+      if (res['token'] == null) {
+        _showError(res['message']?.toString() ?? '이메일 또는 비밀번호를 확인해주세요.');
+        return;
+      }
+
+      // 로그인 성공 - 홈/마이페이지 등에서 바로 쓸 수 있도록 내 프로필을 미리 캐싱
+      await CurrentUser.refresh();
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MainPage()),
+      );
+    } catch (e) {
+      _showError('네트워크 오류가 발생했어요: $e');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   // 소셜 로그인 로고 이미지를 원형 아이콘 형태로 보여주는 헬퍼
@@ -272,6 +318,7 @@ class _SignInPageState extends State<SignInPage> {
                                 controller: passwordController,
                                 obscureText: obscurePassword,
                                 style: const TextStyle(color: Colors.white),
+                                onSubmitted: (_) => _handleLogin(),
                                 decoration: InputDecoration(
                                   hintText: "Enter your password",
                                   hintStyle: const TextStyle(
@@ -316,21 +363,23 @@ class _SignInPageState extends State<SignInPage> {
                                       borderRadius: BorderRadius.circular(30),
                                     ),
                                   ),
-                                  onPressed: () {
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => const MainPage(),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text(
-                                    "Log in",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                  onPressed: _isSubmitting ? null : _handleLogin,
+                                  child: _isSubmitting
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.4,
+                                            color: Color.fromRGBO(10, 11, 36, 1),
+                                          ),
+                                        )
+                                      : const Text(
+                                          "Log in",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
                                 ),
                               ),
                               const SizedBox(height: 24),

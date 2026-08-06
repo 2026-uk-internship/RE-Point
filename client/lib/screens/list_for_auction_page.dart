@@ -3,6 +3,14 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../theme/chat_theme.dart';
 import '../widgets/auction_end_date_picker.dart';
+import '../services/api_service.dart';
+
+// 서버에서 내려주는 카테고리 하나 (id + 표시 이름).
+class _CategoryOption {
+  final int id;
+  final String name;
+  const _CategoryOption({required this.id, required this.name});
+}
 
 /// "Start Auction" 메뉴를 눌렀을 때 뜨는 "Create Auction" (경매 등록) 화면.
 class ListForAuctionPage extends StatefulWidget {
@@ -14,31 +22,6 @@ class ListForAuctionPage extends StatefulWidget {
 
 class _ListForAuctionPageState extends State<ListForAuctionPage> {
   static const int _maxPhotos = 10;
-  static const List<String> _categories = [
-    'Electronics',
-    'Phones & Tablets',
-    'Computers',
-    'Gaming',
-    'Home & Furniture',
-    'Home Appliances',
-    'Clothing',
-    'Beauty & Health',
-    'Books & Stationery',
-    'Sports & Outdoors',
-    'Bicycles',
-    'Toys & Hobbies',
-    'Baby & Kids',
-    'Pets',
-    'Automotive',
-    'Music & Instruments',
-    'Collectibles',
-    'Garden & DIY',
-    'Food & Drinks',
-    'Free Items',
-    'Tickets & Events',
-    'Services',
-    'Other',
-  ];
   static const List<String> _locationOptions = [
     'Camden Town',
     'Islington',
@@ -65,10 +48,94 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
 
   final List<XFile> _selectedImages = [];
   final ImagePicker _imagePicker = ImagePicker();
-  String? _selectedCategory;
+
+  List<_CategoryOption> _categories = [];
+  bool _isLoadingCategories = true;
+  _CategoryOption? _selectedCategory;
   String _location = 'Camden Town';
   String _meetingPreference = 'Public Place';
   DateTime _auctionEndsAt = DateTime.now().add(const Duration(days: 5));
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    setState(() => _isLoadingCategories = true);
+    try {
+      final res = await CategoryService.getCategories();
+      final rawList = (res['data'] is List) ? res['data'] as List : <dynamic>[];
+      setState(() {
+        _categories = rawList
+            .map((e) => _CategoryOption(
+                  id: e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0,
+                  name: e['name']?.toString() ?? e['title']?.toString() ?? 'Category',
+                ))
+            .toList();
+      });
+    } catch (e) {
+      // 카테고리 조회 실패 시 빈 목록 - 사용자가 다시 열어서 재시도 가능
+    } finally {
+      if (mounted) setState(() => _isLoadingCategories = false);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  // ----- 경매 등록 API 호출 -----
+  Future<void> _handlePostListing() async {
+    if (_isSubmitting) return;
+
+    final title = _titleController.text.trim();
+    final startPoint = int.tryParse(_startingBidController.text.trim());
+
+    if (title.isEmpty) {
+      _showMessage('제목을 입력해주세요.');
+      return;
+    }
+    if (_selectedCategory == null) {
+      _showMessage('카테고리를 선택해주세요.');
+      return;
+    }
+    if (startPoint == null) {
+      _showMessage('시작 입찰가를 올바르게 입력해주세요.');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final res = await ProductService.createProduct(
+        title: title,
+        type: 'auction',
+        categoryId: _selectedCategory!.id,
+        location: _location,
+        // TODO: 지도에서 좌표를 선택하는 UI가 생기면 실제 위도/경도로 교체
+        latitude: 51.5074,
+        longitude: -0.1278,
+        startPoint: startPoint,
+        endDate: _auctionEndsAt.toIso8601String(),
+        imagePaths: _selectedImages.map((f) => f.path).toList(),
+      );
+
+      if (res['error'] != null) {
+        _showMessage(res['message']?.toString() ?? '등록에 실패했어요.');
+        return;
+      }
+
+      if (!mounted) return;
+      _showMessage('경매가 등록됐어요!');
+      Navigator.pop(context);
+    } catch (e) {
+      _showMessage('네트워크 오류가 발생했어요: $e');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -333,7 +400,7 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
   // ----- 카테고리 선택 버튼 -----
   Widget _categorySelector() {
     return GestureDetector(
-      onTap: _openCategoryPicker,
+      onTap: _isLoadingCategories ? null : _openCategoryPicker,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
@@ -342,7 +409,9 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
           border: Border.all(color: Colors.white.withOpacity(0.2)),
         ),
         child: Text(
-          _selectedCategory ?? 'Select a category',
+          _isLoadingCategories
+              ? 'Loading categories...'
+              : (_selectedCategory?.name ?? 'Select a category'),
           style: TextStyle(
             color: _selectedCategory != null
                 ? Colors.white
@@ -381,7 +450,7 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
             itemCount: _categories.length,
             itemBuilder: (context, index) {
               final category = _categories[index];
-              final isSelected = category == _selectedCategory;
+              final isSelected = category.id == _selectedCategory?.id;
 
               return InkWell(
                 onTap: () {
@@ -405,7 +474,7 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
                       // 연한 글자색 카테고리 텍스트
                       Expanded(
                         child: Text(
-                          category,
+                          category.name,
                           style: TextStyle(
                             color: isSelected
                                 ? const Color(0xFF241A3D)
@@ -731,13 +800,17 @@ class _ListForAuctionPageState extends State<ListForAuctionPage> {
                 ),
                 elevation: 0,
               ),
-              onPressed: () {
-                // TODO: 등록 API 연결
-              },
-              child: const Text(
-                'Post Listing',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
+              onPressed: _isSubmitting ? null : _handlePostListing,
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.2, color: Color(0xFF241A3D)),
+                    )
+                  : const Text(
+                      'Post Listing',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
             ),
           ),
         ],

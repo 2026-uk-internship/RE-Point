@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'choose_area_page.dart';
+import '../services/api_service.dart';
+import '../services/current_user.dart';
 
 class CreateAccountPage extends StatefulWidget {
   const CreateAccountPage({super.key});
@@ -18,6 +20,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
   bool agreedToTerms = false;
+  bool _isSubmitting = false; // 회원가입 API 호출 중 버튼 중복 탭 방지
 
   @override
   void dispose() {
@@ -27,6 +30,70 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     confirmPasswordController.dispose();
     phoneController.dispose();
     super.dispose();
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  // ----- 회원가입 API 호출 (성공 시 바로 로그인까지 처리) -----
+  Future<void> _handleSignup() async {
+    if (_isSubmitting) return;
+
+    final username = usernameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final confirmPassword = confirmPasswordController.text;
+    final phone = phoneController.text.trim();
+
+    if (username.isEmpty || email.isEmpty || password.isEmpty || phone.isEmpty) {
+      _showError('모든 항목을 입력해주세요.');
+      return;
+    }
+    if (password != confirmPassword) {
+      _showError('비밀번호가 일치하지 않아요.');
+      return;
+    }
+    if (!agreedToTerms) {
+      _showError('약관에 동의해야 다음으로 진행할 수 있어요.');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final signupRes = await AuthService.signup(
+        username: username,
+        email: email,
+        password: password,
+        repassword: confirmPassword,
+        phone: phone,
+      );
+
+      // TODO: 백엔드의 성공 응답 형태(예: {message, data} 등)에 맞춰 성공 판정 조건 조정
+      if (signupRes['error'] != null || signupRes['message'] == 'fail') {
+        _showError(signupRes['message']?.toString() ?? '회원가입에 실패했어요.');
+        return;
+      }
+
+      // 가입 직후 바로 로그인해서 토큰을 받아두고, 다음 온보딩 단계로 이동
+      final loginRes = await AuthService.login(email, password);
+      if (loginRes['token'] == null) {
+        // 가입은 됐지만 자동 로그인이 실패한 경우 - 그래도 다음 단계는 진행시켜줌
+        _showError('가입은 완료됐어요! 다시 로그인해주세요.');
+      } else {
+        await CurrentUser.refresh();
+      }
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ChooseAreaPage()),
+      );
+    } catch (e) {
+      _showError('네트워크 오류가 발생했어요: $e');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   // 로그인 페이지와 동일한 스타일의 입력창 데코레이션
@@ -276,30 +343,23 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                                 borderRadius: BorderRadius.circular(30),
                               ),
                             ),
-                            onPressed: () {
-                              if (!agreedToTerms) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        "약관에 동의해야 다음으로 진행할 수 있어요."),
+                            onPressed: _isSubmitting ? null : _handleSignup,
+                            child: _isSubmitting
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.4,
+                                      color: Color.fromRGBO(10, 11, 36, 1),
+                                    ),
+                                  )
+                                : const Text(
+                                    "NEXT",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                );
-                                return;
-                              }
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const ChooseAreaPage(),
-                                ),
-                              );
-                            },
-                            child: const Text(
-                              "NEXT",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
                           ),
                         ),
                         const SizedBox(height: 30),
