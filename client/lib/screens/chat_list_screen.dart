@@ -258,39 +258,86 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildAvatar(ChatRoomModel room) {
-    return Stack(
-      children: [
-        CircleAvatar(
-          radius: 24,
-          backgroundColor: Colors.white.withOpacity(0.1),
-          backgroundImage: room.opponentAvatarUrl != null
-              ? NetworkImage(room.opponentAvatarUrl!)
-              : null,
-          child: room.opponentAvatarUrl == null
-              ? Text(
-                  room.opponentName.isNotEmpty ? room.opponentName[0] : '?',
-                  style: const TextStyle(color: Colors.white),
-                )
-              : null,
-        ),
-        if (room.isOpponentOnline)
+    // 디자인처럼 (상품 사진 박스) + (그 위에 겹친 프로필 원형 아바타) 구조.
+    // ⚠️ 지금 채팅방 목록 API엔 상품 사진 필드가 없어서, 상품 사진 자리는
+    // 우선 placeholder 박스로 채워둠. 나중에 상품 사진 URL이 API에 추가되면
+    // 아래 productImageUrl 자리에 그 값만 넣어주면 됨.
+    const String? productImageUrl = null; // TODO: 실제 상품 사진 필드 연결
+
+    return SizedBox(
+      width: 56,
+      height: 56,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // 1. 상품 사진 박스 (뒤)
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(16),
+              image: productImageUrl != null
+                  ? DecorationImage(
+                      image: NetworkImage(productImageUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: productImageUrl == null
+                ? const Icon(Icons.image_outlined, color: Colors.white24, size: 22)
+                : null,
+          ),
+          // 2. 프로필 원형 아바타 (앞, 오른쪽 아래에 겹쳐서 배치)
           Positioned(
-            right: 0,
-            bottom: 0,
+            right: -6,
+            bottom: -6,
             child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: ChatColors.onlineDot,
+              padding: const EdgeInsets.all(2), // 흰 테두리 느낌
+              decoration: const BoxDecoration(
+                color: ChatColors.topBarBackground,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: ChatColors.topBarBackground,
-                  width: 2,
-                ),
+              ),
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white.withOpacity(0.15),
+                    backgroundImage: room.opponentAvatarUrl != null
+                        ? NetworkImage(room.opponentAvatarUrl!)
+                        : null,
+                    child: room.opponentAvatarUrl == null
+                        ? Text(
+                            room.opponentName.isNotEmpty
+                                ? room.opponentName[0]
+                                : '?',
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                          )
+                        : null,
+                  ),
+                  if (room.isOpponentOnline)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: ChatColors.onlineDot,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: ChatColors.topBarBackground,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
-      ],
+        ],
+      ),
     );
   }
 }
