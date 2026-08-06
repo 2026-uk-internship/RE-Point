@@ -71,7 +71,7 @@ exports.getRoomList = async (userId, keyword) => {
       counterpartImg: row.counterpartImg,
       productImg: row.productImg,
       lastMessage: row.lastMessage,
-      lastMessageHoursAgo: hoursAgo !== null ? `${hoursAgo}시간 전` : null,
+      lastMessageHoursAgo: hoursAgo !== null ? `${hoursAgo}h ago` : null,
     };
   });
 };

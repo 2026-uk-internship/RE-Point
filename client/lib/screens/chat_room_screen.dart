@@ -5,6 +5,10 @@ import '../models/message_model.dart';
 import '../services/chat_service.dart';
 import '../theme/chat_theme.dart';
 import '../widgets/chat_bubble.dart';
+import 'chat_room_screen.dart';
+import 'schedule_page.dart';
+import 'chat_search_page.dart';
+import 'report_listing_dialog.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
@@ -41,6 +45,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   List<MessageModel> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
+  bool _hasLoadError = false; // 메시지 조회 실패 시 재시도 UI를 보여주기 위한 플래그
 
   final List<_PendingOptimistic> _pending = [];
   StreamSubscription<MessageModel>? _messageSub;
@@ -80,14 +85,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     });
   }
 
+  /// 메시지 목록 조회. 실패(타임아웃/네트워크 오류 등) 시에도
+  /// _isLoading이 반드시 해제되도록 try/catch/finally로 감쌈.
   Future<void> _loadMessages() async {
-    setState(() => _isLoading = true);
-    final messages = await _chatService.fetchMessages(widget.roomId);
     setState(() {
-      _messages = messages;
-      _isLoading = false;
+      _isLoading = true;
+      _hasLoadError = false;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
+    try {
+      final messages = await _chatService.fetchMessages(widget.roomId);
+      if (!mounted) return;
+      setState(() {
+        _messages = messages;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    } catch (e) {
+      debugPrint('메시지 조회 실패: $e');
+      if (mounted) {
+        setState(() => _hasLoadError = true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -247,6 +269,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     ? const Center(
                         child: CircularProgressIndicator(color: Colors.white),
                       )
+                    : _hasLoadError
+                    ? _buildLoadErrorView()
                     : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.symmetric(
@@ -262,6 +286,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// 메시지 조회 실패 시 보여주는 재시도 화면.
+  Widget _buildLoadErrorView() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.wifi_off_rounded,
+            color: ChatColors.textSecondary,
+            size: 36,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '메시지를 불러오지 못했습니다.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 12),
+          TextButton(onPressed: _loadMessages, child: const Text('다시 시도')),
+        ],
       ),
     );
   }
@@ -395,6 +442,41 @@ class _ChatOptionsMenu extends StatelessWidget {
 
   const _ChatOptionsMenu({required this.onSelect});
 
+  void _handleOptionSelect(BuildContext context, ChatMenuOption option) {
+    onSelect(option);
+
+    switch (option) {
+      case ChatMenuOption.schedule:
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const SchedulePage()),
+        );
+        break;
+
+      // case ChatMenuOption.search: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!나중에 수정할 것
+      //   Navigator.push(
+      //     context,
+      //     MaterialPageRoute(builder: (context) => const ChatSearchPage()),
+      //   );
+      //   break;
+
+      // case ChatMenuOption.report:
+      //   showDialog(
+      //     context: context,
+      //     builder: (context) => const ReportListingDialog(),
+      //   );
+      //   break;
+
+      case ChatMenuOption.mute:
+        // 알림 켜기/끄기 로직
+        break;
+
+      case ChatMenuOption.leave:
+        // 채팅방 나가기 처리 로직
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -413,26 +495,31 @@ class _ChatOptionsMenu extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _menuItem(
+              context,
               Icons.event_note_rounded,
               'Doing schedule',
               ChatMenuOption.schedule,
             ),
             _menuItem(
+              context,
               Icons.search_rounded,
               'Searching for Chat',
               ChatMenuOption.search,
             ),
             _menuItem(
+              context,
               Icons.notifications_off_rounded,
               'Turn off notifications',
               ChatMenuOption.mute,
             ),
             _menuItem(
+              context,
               Icons.error_outline_rounded,
               'Report',
               ChatMenuOption.report,
             ),
             _menuItem(
+              context,
               Icons.logout_rounded,
               'Going out to the chat room',
               ChatMenuOption.leave,
@@ -445,13 +532,14 @@ class _ChatOptionsMenu extends StatelessWidget {
   }
 
   Widget _menuItem(
+    BuildContext context,
     IconData icon,
     String label,
     ChatMenuOption option, {
     Color color = Colors.white,
   }) {
     return InkWell(
-      onTap: () => onSelect(option),
+      onTap: () => _handleOptionSelect(context, option),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
