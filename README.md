@@ -21,6 +21,23 @@ A neighborhood marketplace platform for local secondhand trading. Supports gener
 
 ---
 
+## Getting Started
+ 
+The backend is already deployed and does not need to be run locally. The Flutter app sends its HTTP and Socket.IO requests directly to the deployed server:
+ 
+```
+https://re-point.up.railway.app
+```
+ 
+To run the Flutter app, navigate into the `client` folder and run:
+ 
+```
+cd client
+flutter run
+```
+ 
+---
+
 ## Backend Structure (`server/node/src`)
 
 ```
