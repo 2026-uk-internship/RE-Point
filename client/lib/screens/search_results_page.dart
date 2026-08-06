@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/chat_theme.dart';
 import 'item_detail_page.dart';
 import 'auction_detail_page.dart';
+import '../services/api_service.dart';
 
 /// 검색 실행 후 나오는 결과 화면.
 ///
@@ -77,82 +78,70 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   _SecondhandSort _secondhandSort = _SecondhandSort.newest;
   _AuctionSort _auctionSort = _AuctionSort.endingSoon;
 
-  // TODO: SearchService.searchSecondhand(query) 로 교체
-  final List<_SecondhandResult> _secondhandItems = const [
-    _SecondhandResult(
-      id: 1,
-      title: 'Art marker',
-      timeAgo: '9 days ago',
-      price: '£ 5',
-      likeCount: 4,
-      commentCount: 1,
-    ),
-    _SecondhandResult(
-      id: 2,
-      title: '80-color marker',
-      timeAgo: '1 month ago',
-      price: '£ 7',
-      likeCount: 2,
-      commentCount: 0,
-    ),
-    _SecondhandResult(
-      id: 3,
-      title: '167 marker',
-      timeAgo: '4 days ago',
-      price: '£ 5',
-      likeCount: 10,
-      commentCount: 6,
-    ),
-    _SecondhandResult(
-      id: 4,
-      title: 'Acrylic marker',
-      timeAgo: '6 days ago',
-      price: '£ 2',
-      likeCount: 4,
-      commentCount: 2,
-    ),
-    _SecondhandResult(
-      id: 5,
-      title: 'Marker',
-      timeAgo: '1 day ago',
-      price: '£ 1',
-      likeCount: 1,
-      commentCount: 0,
-    ),
-  ];
+  bool _isLoading = true;
 
-  // TODO: SearchService.searchAuctions(query) 로 교체
-  final List<_AuctionResult> _auctionItems = const [
-    _AuctionResult(
-      id: 101,
-      title: 'picture marker',
-      location: 'Camden, London',
-      isLive: true,
-      timeLeft: '10h 5m left',
-      pricePoints: 420,
-    ),
-    _AuctionResult(
-      id: 102,
-      title: 'marker is new',
-      location: 'soho, London',
-      isLive: true,
-      timeLeft: '2d 2h left',
-      pricePoints: 380,
-    ),
-    _AuctionResult(
-      id: 103,
-      title: '80-color marker',
-      location: 'soho, London',
-      isLive: true,
-      timeLeft: '0h 55m left',
-      pricePoints: 445,
-    ),
-  ];
+  // TODO: 실제 응답 필드명이 다르면 _runSearch()의 파싱 부분만 조정
+  List<_SecondhandResult> _secondhandItems = [];
+  List<_AuctionResult> _auctionItems = [];
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController(text: widget.initialQuery);
+    _runSearch(widget.initialQuery);
+  }
+
+  Future<void> _runSearch(String keyword) async {
+    final trimmed = keyword.trim();
+    if (trimmed.isEmpty) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final res = await SearchService.searchProducts(trimmed);
+      final rawList = (res['data'] is List) ? res['data'] as List : <dynamic>[];
+
+      final secondhand = <_SecondhandResult>[];
+      final auctions = <_AuctionResult>[];
+
+      for (final e in rawList) {
+        final id = e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0;
+        final images = e['images'];
+        final imageUrl = (images is List && images.isNotEmpty) ? images[0]?.toString() : null;
+        final type = e['type']?.toString();
+
+        if (type == 'auction') {
+          final auction = e['auction'] as Map<String, dynamic>?;
+          auctions.add(_AuctionResult(
+            id: id,
+            title: e['title']?.toString() ?? '',
+            location: e['location']?.toString() ?? '',
+            isLive: true,
+            timeLeft: auction?['end_date']?.toString() ?? '',
+            pricePoints: auction?['start_point'] is int ? auction!['start_point'] as int : 0,
+            imageUrl: imageUrl,
+          ));
+        } else {
+          secondhand.add(_SecondhandResult(
+            id: id,
+            title: e['title']?.toString() ?? '',
+            timeAgo: e['createdAt']?.toString() ?? '',
+            price: '£ ${e['money_price'] ?? e['point_price'] ?? 0}',
+            likeCount: e['likeCount'] is int ? e['likeCount'] as int : 0,
+            commentCount: e['commentCount'] is int ? e['commentCount'] as int : 0,
+            imageUrl: imageUrl,
+          ));
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _secondhandItems = secondhand;
+        _auctionItems = auctions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -191,9 +180,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               _buildFilterChips(),
               const SizedBox(height: 8),
               Expanded(
-                child: _tabIndex == 0
-                    ? _buildSecondhandList()
-                    : _buildAuctionList(),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                    : (_tabIndex == 0 ? _buildSecondhandList() : _buildAuctionList()),
               ),
             ],
           ),
@@ -233,7 +222,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                         hintText: 'Search...',
                         hintStyle: TextStyle(color: ChatColors.textSecondary),
                       ),
-                      onSubmitted: (_) => setState(() {}), // TODO: 실제 재검색 API 호출
+                      onSubmitted: (value) => _runSearch(value),
                     ),
                   ),
                   const Icon(Icons.search, color: ChatColors.textSecondary, size: 20),

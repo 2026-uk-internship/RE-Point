@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/chat_theme.dart';
+import '../services/api_service.dart';
+import '../services/current_user.dart';
+import 'sign_in_page.dart';
 
 class MyPage extends StatefulWidget {
   const MyPage({super.key});
@@ -9,12 +12,45 @@ class MyPage extends StatefulWidget {
 }
 
 class _MyPageState extends State<MyPage> {
-  // 더미 사용자 데이터 (추후 백엔드/프로필 데이터로 대체)
-  final String userName = "Oliver :B";
-  final String userEmail = "oliver.dev@example.com";
-  final int rePoints = 1250;
-  final double rating = 4.9;
-  final int totalTransactions = 18;
+  // CurrentUser 캐시로 우선 채우고, 없으면 서버에서 다시 조회
+  String userName = CurrentUser.username ?? "Oliver :B";
+  String userEmail = CurrentUser.email ?? "";
+  int rePoints = CurrentUser.points ?? 0;
+
+  // TODO: 평점/거래 수는 별도 API가 생기면 그걸로 교체 (지금은 profile 응답에 없으면 더미 유지)
+  double rating = 4.9;
+  int totalTransactions = 18;
+
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _isLoading = true);
+    await CurrentUser.refresh();
+    if (!mounted) return;
+    setState(() {
+      userName = CurrentUser.username ?? userName;
+      userEmail = CurrentUser.email ?? userEmail;
+      rePoints = CurrentUser.points ?? rePoints;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _handleSignOut() async {
+    ApiConfig.clearToken();
+    CurrentUser.clear();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const SignInPage()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -323,7 +359,7 @@ class _MyPageState extends State<MyPage> {
           _buildMenuItem(
             Icons.logout_rounded,
             'Sign Out',
-            () {},
+            _handleSignOut,
             textColor: ChatColors.danger,
             iconColor: ChatColors.danger,
           ),

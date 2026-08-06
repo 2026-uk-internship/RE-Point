@@ -4,6 +4,8 @@ import 'alarm_page.dart';
 import 'list_for_auction_page.dart';
 import 'post_auction_page.dart';
 import 'item_detail_page.dart';
+import '../services/api_service.dart';
+import '../services/current_user.dart';
 
 /// 홈 탭 화면 (디자인 시안의 "mainpage").
 ///
@@ -70,48 +72,103 @@ class _CommunityPost {
 }
 
 class _HomePageState extends State<HomePage> {
-  // TODO: 실제 로그인 사용자 정보로 교체
-  final String userName = 'ANDY';
-  final String userLocation = 'Camden, London';
-  final int userPoints = 50;
+  // 로그인 사용자 정보 - CurrentUser 캐시가 있으면 그걸 쓰고, 없으면 불러올 때까지 기본값 표시
+  String userName = CurrentUser.username ?? 'ANDY';
+  String userLocation = CurrentUser.location ?? 'Camden, London';
+  int userPoints = CurrentUser.points ?? 0;
 
   // Writing 버튼을 눌렀을 때 뜨는 "List for Auction / Post Auction" 메뉴 표시 여부.
   bool _isWriteMenuOpen = false;
 
-  // TODO: HomeService.fetchTrendingAuctions() 등으로 교체
-  final List<_AuctionItem> trendingAuctions = const [
-    _AuctionItem(id: 1, title: 'Animal book', price: 'P 10', timeAgo: '00:29 left'),
-    _AuctionItem(id: 2, title: 'CRAFFAS', price: 'P 25', timeAgo: '01:23 left'),
-    _AuctionItem(id: 3, title: 'fine paint', price: 'P 100', timeAgo: '02:40 left'),
-    _AuctionItem(id: 4, title: 'shirts', price: 'P 50', timeAgo: '04:32 left'),
-  ];
+  bool _isLoadingFeed = true;
 
-  final List<_SecondhandItem> nearbySecondhand = const [
-    _SecondhandItem(id: 10, title: 'Art marker', price: '£10', location: 'London Camden'),
-    _SecondhandItem(id: 11, title: 'uniform shirt', price: '£3', location: 'London Camden'),
-    _SecondhandItem(id: 12, title: 'Bike', price: '£0', location: 'London Camden'),
-  ];
+  // TODO: 실제 응답 필드명이 다르면 _loadHomeData()의 파싱 부분만 조정
+  List<_AuctionItem> trendingAuctions = [];
+  List<_SecondhandItem> nearbySecondhand = [];
+  List<_CommunityPost> communityPosts = [];
 
-  final List<_CommunityPost> communityPosts = const [
-    _CommunityPost(
-      title: 'Discipline for using profanity',
-      tag: 'RULE',
-      location: 'Head office',
-      commentCount: 28,
-    ),
-    _CommunityPost(
-      title: 'Tips for earning points',
-      tag: 'TIP',
-      location: 'London',
-      commentCount: 9,
-    ),
-    _CommunityPost(
-      title: "This month's event schedule",
-      tag: 'EVENT',
-      location: 'Head office',
-      commentCount: 4,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadHomeData();
+  }
+
+  Future<void> _loadHomeData() async {
+    setState(() => _isLoadingFeed = true);
+
+    // 프로필 정보가 아직 캐싱 안 되어 있으면 먼저 채워둠
+    if (!CurrentUser.isLoaded) {
+      await CurrentUser.refresh();
+    }
+    if (CurrentUser.isLoaded && mounted) {
+      setState(() {
+        userName = CurrentUser.username ?? userName;
+        userLocation = CurrentUser.location ?? userLocation;
+        userPoints = CurrentUser.points ?? userPoints;
+      });
+    }
+
+    // Trending Auctions / Nearby Secondhand / Community를 병렬로 조회
+    final results = await Future.wait([
+      ProductService.getProductList('auction', sort: 'newest'),
+      ProductService.getProductList('general', sort: 'newest'),
+      BoardService.getPosts(),
+    ], eagerError: false);
+
+    if (!mounted) return;
+
+    setState(() {
+      trendingAuctions = _parseAuctions(results[0]);
+      nearbySecondhand = _parseSecondhand(results[1]);
+      communityPosts = _parseCommunityPosts(results[2]);
+      _isLoadingFeed = false;
+    });
+  }
+
+  List<_AuctionItem> _parseAuctions(Map<String, dynamic> res) {
+    final rawList = (res['data'] is List) ? res['data'] as List : <dynamic>[];
+    return rawList.map((e) {
+      final id = e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0;
+      final images = e['images'];
+      final imageUrl = (images is List && images.isNotEmpty) ? images[0]?.toString() : null;
+      final auction = e['auction'] as Map<String, dynamic>?;
+      return _AuctionItem(
+        id: id,
+        title: e['title']?.toString() ?? '',
+        price: 'P ${auction?['start_point'] ?? e['point_price'] ?? 0}',
+        timeAgo: auction?['end_date']?.toString() ?? '',
+        imageUrl: imageUrl,
+      );
+    }).toList();
+  }
+
+  List<_SecondhandItem> _parseSecondhand(Map<String, dynamic> res) {
+    final rawList = (res['data'] is List) ? res['data'] as List : <dynamic>[];
+    return rawList.map((e) {
+      final id = e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}') ?? 0;
+      final images = e['images'];
+      final imageUrl = (images is List && images.isNotEmpty) ? images[0]?.toString() : null;
+      return _SecondhandItem(
+        id: id,
+        title: e['title']?.toString() ?? '',
+        price: '£${e['money_price'] ?? 0}',
+        location: e['location']?.toString() ?? '',
+        imageUrl: imageUrl,
+      );
+    }).toList();
+  }
+
+  List<_CommunityPost> _parseCommunityPosts(Map<String, dynamic> res) {
+    final rawList = (res['data'] is List) ? res['data'] as List : <dynamic>[];
+    return rawList.take(3).map((e) {
+      return _CommunityPost(
+        title: e['title']?.toString() ?? '',
+        tag: e['tag']?.toString() ?? '',
+        location: e['location']?.toString() ?? '',
+        commentCount: e['commentCount'] is int ? e['commentCount'] as int : 0,
+      );
+    }).toList();
+  }
 
   void _toggleWriteMenu() {
     setState(() => _isWriteMenuOpen = !_isWriteMenuOpen);

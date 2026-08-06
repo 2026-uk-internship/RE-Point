@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'main_page.dart';
 import 'create_account_page.dart';
 import '../services/api_service.dart';
+import '../services/current_user.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -62,6 +63,9 @@ class _SignInPageState extends State<SignInPage> {
         _showError(res['message']?.toString() ?? '이메일 또는 비밀번호를 확인해주세요.');
         return;
       }
+
+      // 로그인 성공 - 홈/마이페이지 등에서 바로 쓸 수 있도록 내 프로필을 미리 캐싱
+      await CurrentUser.refresh();
 
       if (!mounted) return;
       Navigator.pushReplacement(
