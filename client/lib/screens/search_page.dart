@@ -494,12 +494,18 @@ class _SearchPageState extends State<SearchPage> {
   Widget _similarItemThumbnail(_SimilarItem item) {
     return GestureDetector(
       onTap: item.id != null
-          ? () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ItemDetailPage(productId: item.id!),
-              ),
-            )
+          ? () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ItemDetailPage(productId: item.id!),
+                ),
+              );
+              // 상세 페이지에서 돌아오면 최근 본 목록/태그 다시 불러오기
+              if (mounted) {
+                _loadSimilarItems();
+              }
+            }
           : null,
       child: Container(
         width: 120,
