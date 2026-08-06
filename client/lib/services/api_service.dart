@@ -155,6 +155,7 @@ class ProductService {
   static Future<Map<String, dynamic>> getProductDetail(int productId) async {
     final res = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/products/$productId'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
     );
     return jsonDecode(res.body);
   }
@@ -233,6 +234,22 @@ class ProductService {
 
     final streamedRes = await req.send();
     final res = await http.Response.fromStream(streamedRes);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getRecentViewedGeneral() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/recent/general'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getRecentViewedAuction() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/products/me/recent/auctions'),
+      headers: ApiConfig.getHeaders(needsAuth: true),
+    );
     return jsonDecode(res.body);
   }
 
