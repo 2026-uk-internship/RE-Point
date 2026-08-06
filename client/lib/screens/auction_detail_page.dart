@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/chat_theme.dart';
 import '../widgets/top_toast.dart';
+import '../services/api_service.dart';
+import '../services/current_user.dart';
 
 /// 경매 게시물 상세 화면 ("Live" 뱃지, Place Bid, Bid history, Similar Auctions).
 ///
@@ -51,8 +53,8 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
   bool _isLoading = true;
   bool _isFavorite = false;
 
-  // ----- 더미 데이터 (추후 API 응답으로 교체) -----
-  List<String?> _images = [null, null, null];
+  // ----- 실제 데이터로 채워짐 (초기값은 로딩 중 표시용 placeholder) -----
+  List<String?> _images = [null];
   String _sellerName = 'James';
   String _sellerBadge = 'Leaf';
   String _location = 'Camden, London';
@@ -63,34 +65,120 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
   bool _isLive = true;
   String _timeLeft = '10h 5m left';
 
-  int _currentBid = 420;
+  int _currentBid = 0;
   static const int _bidIncrement = 10;
-  int _bidCount = 18;
-  int _availablePoints = 460;
+  int _bidCount = 0;
+  int _availablePoints = 0;
 
-  final List<_BidEntry> _bidHistory = const [
-    _BidEntry(bidderName: 'Oliver', amount: 420, timeAgo: '5 minutes ago'),
-    _BidEntry(bidderName: 'Grace', amount: 410, timeAgo: '22 minutes ago'),
-    _BidEntry(bidderName: 'Noah', amount: 390, timeAgo: '1 hour ago'),
-    _BidEntry(bidderName: 'James', amount: 370, timeAgo: '3 hours ago'),
-  ];
+  List<_BidEntry> _bidHistory = [];
 
-  final List<_SimilarAuction> _similarAuctions = const [
-    _SimilarAuction(id: 201, title: 'Marker set', pricePoints: 20),
-    _SimilarAuction(id: 202, title: 'Bicycle helmet', pricePoints: 50),
-  ];
+  List<_SimilarAuction> _similarAuctions = [];
 
   @override
   void initState() {
     super.initState();
-    _loadDummyData();
+    _loadAuctionDetail();
   }
 
-  Future<void> _loadDummyData() async {
-    // TODO: AuctionService.getAuctionDetail(widget.auctionId)로 교체
-    await Future.delayed(const Duration(milliseconds: 200));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+  // TODO(백엔드 확인 필요): 아래 필드명들은 서버 실제 응답을 보고 확정된 게 아니라
+  // 그럴듯한 이름들로 defensive하게 추측한 것입니다. 실제 응답과 다르면
+  // 이 함수 안의 키 이름만 맞춰주면 됩니다.
+  Future<void> _loadAuctionDetail() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await ProductService.getAuctionDetail(widget.auctionId);
+      final data = (res['data'] is Map<String, dynamic>)
+          ? res['data'] as Map<String, dynamic>
+          : res;
+
+      final images = _extractImages(data);
+      final currentBid = data['currentBid'] ??
+          data['current_point'] ??
+          data['currentPoint'] ??
+          data['startPoint'] ??
+          data['start_point'] ??
+          0;
+      final bidCount = data['bidCount'] ?? data['bid_count'] ?? 0;
+
+      // 참여자 목록을 입찰 내역으로 사용 (전용 bid-history API가 아직 없음)
+      List<_BidEntry> bidHistory = [];
+      try {
+        final participantsRes =
+            await ProductService.getAuctionParticipants(widget.auctionId);
+        final participantsData = participantsRes['data'] ?? participantsRes;
+        if (participantsData is List) {
+          bidHistory = participantsData
+              .map((p) => _bidEntryFromJson(p as Map<String, dynamic>))
+              .toList();
+        }
+      } catch (e) {
+        debugPrint('입찰 참여자 조회 실패: $e');
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _images = images.isNotEmpty ? images : [null];
+        _sellerName = (data['userName'] ?? data['seller']?['username'] ?? 'Seller').toString();
+        _sellerBadge = (data['sellerBadge'] ?? 'Leaf').toString();
+        _location = (data['location'] ?? '').toString();
+        _title = (data['title'] ?? '제목 없음').toString();
+        _category = (data['category'] ?? data['categoryName'] ?? '').toString();
+        _description = (data['content'] ?? data['description'] ?? data['contents'] ?? '').toString();
+        _isFavorite = data['isLiked'] == true;
+        _timeLeft = _formatTimeLeft(data['endDate'] ?? data['end_date']);
+        _isLive = _timeLeft != 'Ended';
+        _currentBid = currentBid is int ? currentBid : int.tryParse('$currentBid') ?? 0;
+        _bidCount = bidCount is int ? bidCount : int.tryParse('$bidCount') ?? 0;
+        _availablePoints = CurrentUser.points ?? 0;
+        _bidHistory = bidHistory;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('경매 상세 조회 실패: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  List<String?> _extractImages(Map<String, dynamic> data) {
+    if (data['images'] is List && (data['images'] as List).isNotEmpty) {
+      return (data['images'] as List).map((e) => e.toString()).toList();
+    }
+    if (data['imgUrl'] != null) {
+      return [data['imgUrl'].toString()];
+    }
+    return [];
+  }
+
+  _BidEntry _bidEntryFromJson(Map<String, dynamic> json) {
+    final rawTime = (json['createdAt'] ?? json['timeAgo'] ?? '').toString();
+    final parsedTime = DateTime.tryParse(rawTime);
+    return _BidEntry(
+      bidderName: (json['userName'] ?? json['username'] ?? 'Bidder').toString(),
+      amount: json['amount'] is int
+          ? json['amount'] as int
+          : int.tryParse('${json['amount'] ?? json['bidAmount'] ?? 0}') ?? 0,
+      timeAgo: parsedTime != null ? _relativeTime(parsedTime) : rawTime,
+    );
+  }
+
+  String _relativeTime(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} minute${diff.inMinutes == 1 ? '' : 's'} ago';
+    if (diff.inHours < 24) return '${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+    return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+  }
+
+  // endDate 문자열을 "10h 5m left" 같은 형태로 변환.
+  String _formatTimeLeft(dynamic endDateRaw) {
+    if (endDateRaw == null) return '';
+    final endDate = DateTime.tryParse(endDateRaw.toString());
+    if (endDate == null) return '';
+    final remaining = endDate.difference(DateTime.now());
+    if (remaining.isNegative) return 'Ended';
+    final hours = remaining.inHours;
+    final minutes = remaining.inMinutes % 60;
+    return '${hours}h ${minutes}m left';
   }
 
   @override
@@ -99,9 +187,20 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
     super.dispose();
   }
 
-  void _toggleFavorite() {
+  Future<void> _toggleFavorite() async {
+    final previousState = _isFavorite;
     setState(() => _isFavorite = !_isFavorite);
-    // TODO: 찜하기 API 연동
+
+    try {
+      final res = await ProductService.toggleFavorite(widget.auctionId);
+      final data = res['data'];
+      if (data is Map && data['favorited'] != null) {
+        setState(() => _isFavorite = data['favorited'] as bool);
+      }
+    } catch (e) {
+      setState(() => _isFavorite = previousState);
+      debugPrint('찜하기 요청 실패: $e');
+    }
   }
 
   @override
@@ -745,9 +844,12 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
   }
 
   // ----- 입찰 반영 + 상단 성공 토스트 -----
+  // TODO(백엔드 요청 필요): 입찰을 "제출"하는 API/소켓 이벤트가 아직 없습니다.
+  // (getAuctionDetail, getAuctionParticipants는 조회용일 뿐 입찰 제출용이 아님)
+  // 지금은 화면에서만 낙관적으로 반영하고 서버에는 아무것도 보내지 않습니다.
+  // 백엔드팀에 "입찰 제출" 엔드포인트(예: POST /products/auctions/:id/bids
+  // 또는 소켓 place_bid 이벤트)가 추가되면 여기서 실제로 호출해야 합니다.
   void _placeBid(int amount) {
-    // TODO: 실제 입찰 API 호출로 교체. 실패 시 아래 setState를 롤백하고
-    // showTopToast로 실패 메시지를 보여주면 됨.
     setState(() {
       _currentBid = amount;
       _bidCount += 1;

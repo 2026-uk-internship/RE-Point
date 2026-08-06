@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart'; // ApiConfig, ProductService, ProductSocketService 등 import
 import 'chat_room_screen.dart';
 import '../services/chat_service.dart';
+import 'auction_detail_page.dart';
 
 // 이 화면 전용 색상 상수.
 // 배경 0A0B24 / 하단 고정 카드류 31324C / 하트·채팅 아이콘 흰색
@@ -53,6 +54,21 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
         final data = (res['data'] is Map<String, dynamic>)
             ? res['data'] as Map<String, dynamic>
             : res;
+
+        // 경매(auction) 게시물이면 이 화면 대신 전용 입찰 화면으로 바로 이동.
+        // TODO: 백엔드가 내려주는 타입 필드명이 'type'이 아니면 여기만 맞춰주세요.
+        final type = data['type']?.toString();
+        if (type == 'auction') {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AuctionDetailPage(auctionId: widget.productId),
+              ),
+            );
+          }
+          return;
+        }
 
         setState(() {
           _productData = data;

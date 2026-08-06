@@ -190,6 +190,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   void _handleMenuSelect(ChatMenuOption option) async {
     _closeMenu();
     switch (option) {
+      case ChatMenuOption.complete:
+        await _showCompleteTransactionDialog();
+        break;
       case ChatMenuOption.schedule:
         final picked = await Navigator.push<DateTime>(
           context,
@@ -249,6 +252,42 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       case ChatMenuOption.leave:
         await _showLeaveConfirmDialog();
         break;
+    }
+  }
+
+  Future<void> _showCompleteTransactionDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: ChatColors.cardBackground,
+        title: const Text(
+          'Complete Transaction',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Mark this transaction as complete?',
+          style: TextStyle(color: ChatColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Accept',
+              style: TextStyle(color: ChatColors.accentYellow, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Transaction marked as complete!')),
+      );
     }
   }
 
@@ -477,7 +516,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 }
 
-enum ChatMenuOption { schedule, search, mute, report, leave }
+enum ChatMenuOption { complete, schedule, search, mute, report, leave }
 
 class _ChatOptionsMenu extends StatelessWidget {
   final ValueChanged<ChatMenuOption> onSelect;
@@ -508,6 +547,16 @@ class _ChatOptionsMenu extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
 
           children: [
+            _menuItem(
+              Icons.task_alt_rounded,
+
+              'Complete Transaction',
+
+              ChatMenuOption.complete,
+
+              color: ChatColors.accentYellow,
+            ),
+
             _menuItem(
               Icons.event_note_rounded,
 
