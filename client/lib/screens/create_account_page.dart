@@ -68,17 +68,25 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
         repassword: confirmPassword,
         phone: phone,
       );
+      debugPrint('🔍 [Signup] 응답: $signupRes');
 
-      // TODO: 백엔드의 성공 응답 형태(예: {message, data} 등)에 맞춰 성공 판정 조건 조정
-      if (signupRes['error'] != null || signupRes['message'] == 'fail') {
-        _showError(signupRes['message']?.toString() ?? '회원가입에 실패했어요.');
-        return;
+      // 메시지 문구 추측이 아니라 실제 HTTP 상태코드로 성공 여부 판단.
+      // 200/201이 아니면 실패로 보고 여기서 멈춤 (다음 단계로 진행 안 시킴).
+      final statusCode = signupRes['_statusCode'] as int? ?? 0;
+      final isSuccess = statusCode >= 200 && statusCode < 300;
+
+      if (!isSuccess) {
+        _showError(
+          signupRes['message']?.toString() ??
+              '회원가입에 실패했어요. (코드: $statusCode)',
+        );
+        return; // 실패했으니 여기서 중단 - 온보딩으로 넘어가지 않음
       }
 
       // 가입 직후 바로 로그인해서 토큰을 받아두고, 다음 온보딩 단계로 이동
       final loginRes = await AuthService.login(email, password);
       if (loginRes['token'] == null) {
-        // 가입은 됐지만 자동 로그인이 실패한 경우 - 그래도 다음 단계는 진행시켜줌
+        // 가입은 진짜 됐지만(statusCode 확인함) 자동 로그인만 실패한 경우
         _showError('가입은 완료됐어요! 다시 로그인해주세요.');
       } else {
         await CurrentUser.refresh();

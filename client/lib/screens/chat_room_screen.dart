@@ -442,87 +442,69 @@ class _ChatOptionsMenu extends StatelessWidget {
 
   const _ChatOptionsMenu({required this.onSelect});
 
-  void _handleOptionSelect(BuildContext context, ChatMenuOption option) {
-    onSelect(option);
-
-    switch (option) {
-      case ChatMenuOption.schedule:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const SchedulePage()),
-        );
-        break;
-
-      // case ChatMenuOption.search: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!나중에 수정할 것
-      //   Navigator.push(
-      //     context,
-      //     MaterialPageRoute(builder: (context) => const ChatSearchPage()),
-      //   );
-      //   break;
-
-      // case ChatMenuOption.report:
-      //   showDialog(
-      //     context: context,
-      //     builder: (context) => const ReportListingDialog(),
-      //   );
-      //   break;
-
-      case ChatMenuOption.mute:
-        // 알림 켜기/끄기 로직
-        break;
-
-      case ChatMenuOption.leave:
-        // 채팅방 나가기 처리 로직
-        break;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
+
       child: Container(
         width: 220,
+
         decoration: BoxDecoration(
           color: ChatColors.cardBackground,
+
           borderRadius: BorderRadius.circular(14),
+
           boxShadow: [
             BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 16),
           ],
         ),
+
         padding: const EdgeInsets.symmetric(vertical: 6),
+
         child: Column(
           mainAxisSize: MainAxisSize.min,
+
           children: [
             _menuItem(
-              context,
               Icons.event_note_rounded,
+
               'Doing schedule',
+
               ChatMenuOption.schedule,
             ),
+
             _menuItem(
-              context,
               Icons.search_rounded,
+
               'Searching for Chat',
+
               ChatMenuOption.search,
             ),
+
             _menuItem(
-              context,
               Icons.notifications_off_rounded,
+
               'Turn off notifications',
+
               ChatMenuOption.mute,
             ),
+
             _menuItem(
-              context,
               Icons.error_outline_rounded,
+
               'Report',
+
               ChatMenuOption.report,
             ),
+
             _menuItem(
-              context,
               Icons.logout_rounded,
+
               'Going out to the chat room',
+
               ChatMenuOption.leave,
+
               color: ChatColors.danger,
             ),
           ],
@@ -532,20 +514,26 @@ class _ChatOptionsMenu extends StatelessWidget {
   }
 
   Widget _menuItem(
-    BuildContext context,
     IconData icon,
+
     String label,
+
     ChatMenuOption option, {
+
     Color color = Colors.white,
   }) {
     return InkWell(
-      onTap: () => _handleOptionSelect(context, option),
+      onTap: () => onSelect(option),
+
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+
         child: Row(
           children: [
             Icon(icon, size: 18, color: color),
+
             const SizedBox(width: 12),
+
             Expanded(
               child: Text(label, style: TextStyle(color: color, fontSize: 13)),
             ),
