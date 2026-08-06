@@ -185,7 +185,16 @@ class ProductService {
       Uri.parse('${ApiConfig.baseUrl}/products/$productId/favorite'),
       headers: ApiConfig.getHeaders(needsAuth: true),
     );
-    return jsonDecode(res.body);
+
+    final body = res.body.isNotEmpty
+        ? jsonDecode(res.body) as Map<String, dynamic>
+        : <String, dynamic>{};
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception(body['message'] ?? '찜하기 요청 실패 (${res.statusCode})');
+    }
+
+    return body;
   }
 
   static Future<Map<String, dynamic>> createProduct({
