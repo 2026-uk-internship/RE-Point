@@ -31,14 +31,27 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _loadRooms();
   }
 
+  bool _hasLoadError = false;
+
   Future<void> _loadRooms() async {
-    setState(() => _isLoading = true);
-    final rooms = await _chatService.fetchChatRooms();
     setState(() {
-      _allRooms = rooms;
-      _filteredRooms = rooms;
-      _isLoading = false;
+      _isLoading = true;
+      _hasLoadError = false;
     });
+
+    try {
+      final rooms = await _chatService.fetchChatRooms();
+      if (!mounted) return;
+      setState(() {
+        _allRooms = rooms;
+        _filteredRooms = rooms;
+      });
+    } catch (e) {
+      debugPrint('채팅방 목록 조회 실패: $e');
+      if (mounted) setState(() => _hasLoadError = true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _onSearchChanged(String query) {
@@ -70,6 +83,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
               child: _isLoading
                   ? const Center(
                       child: CircularProgressIndicator(color: Colors.white),
+                    )
+                  : _hasLoadError
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            '채팅 목록을 불러오지 못했습니다.',
+                            style: TextStyle(color: ChatColors.textSecondary),
+                          ),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: _loadRooms,
+                            child: const Text('다시 시도'),
+                          ),
+                        ],
+                      ),
                     )
                   : RefreshIndicator(
                       onRefresh: _loadRooms,

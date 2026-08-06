@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/chat_theme.dart';
 import '../services/api_service.dart'; // ApiConfig, ProductService, ProductSocketService 등 import
 import 'chat_room_screen.dart';
+import '../services/chat_service.dart';
 
 class ItemDetailPage extends StatefulWidget {
   final int productId; // 조회할 상품 ID
@@ -108,32 +109,26 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
     setState(() => _isStartingChat = true);
 
     try {
-      final res = await ChatRoomService.createOrJoinRoom(widget.productId);
+      final roomId = await ChatService.instance.createOrEnterRoom(
+        widget.productId.toString(),
+      );
 
-      // 성공: { "data": { "roomId": 123 } }
-      // 실패: { "message": "..." }
-      if (res['data'] != null && res['data']['roomId'] != null) {
-        final roomId = res['data']['roomId']; // int (insertId / 기존 room.id)
+      if (!mounted) return;
 
-        if (!mounted) return;
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChatRoomScreen(
-              roomId: roomId, // ⚠️ ChatRoomScreen 쪽 roomId 타입이 int인지 확인 필요
-              opponentName: sellerName,
-            ),
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatRoomScreen(
+            roomId: roomId, // 이미 String
+            opponentName: sellerName,
           ),
-        );
-      } else {
-        // 서버가 message로 내려주는 에러 (본인 상품, 상품 없음 등)
-        final message = res['message']?.toString() ?? '채팅방을 열 수 없습니다.';
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(message)));
-        }
+        ),
+      );
+    } on ChatServiceException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (e) {
       debugPrint('채팅방 생성/입장 실패: $e');

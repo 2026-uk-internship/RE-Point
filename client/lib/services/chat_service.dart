@@ -6,6 +6,8 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 import '../models/chat_room_model.dart';
 import '../models/message_model.dart';
+import 'api_service.dart'; // ApiConfig
+import 'current_user.dart'; // CurrentUser
 
 /// 채팅 관련 데이터를 다루는 서비스 레이어.
 ///
@@ -21,11 +23,11 @@ class ChatService {
 
   static const String _baseUrl = 'https://re-point.up.railway.app';
 
-  // TODO: 실제 로그인/토큰 관리 모듈로 교체하세요.
-  String? get _token => AuthService.instance.token;
+  // 로그인 시 AuthService.login()이 저장해두는 진짜 토큰을 그대로 참조.
+  String? get _token => ApiConfig.token;
 
   /// 프론트가 ChatService.currentUserId처럼 클래스 레벨에서 바로 접근하고 있어서 static으로 제공.
-  static String get currentUserId => AuthService.instance.userId ?? '';
+  static String get currentUserId => CurrentUser.id?.toString() ?? '';
 
   Map<String, String> get _authHeaders {
     if (_token == null) {
@@ -300,14 +302,4 @@ class ChatServiceException implements Exception {
 
   @override
   String toString() => 'ChatServiceException($code): $message';
-}
-
-/// 로그인 토큰/유저 정보 접근용 자리표시자.
-/// TODO: 프로젝트에 이미 있는 실제 인증 서비스로 교체하세요.
-class AuthService {
-  static final AuthService instance = AuthService._internal();
-  AuthService._internal();
-
-  String? token;
-  String? userId;
 }
